@@ -36,7 +36,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Candle, ChainKey, LivePool, LiveSwap, RiskLevel, TokenSummary } from "../lib/types";
 import { fetchLiveData, fetchTokenCandles, fetchTokenSwaps } from "../lib/api";
@@ -139,15 +139,20 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   const [activeNav, setActiveNav] = useState("Radar");
   const [comingSoonLabel, setComingSoonLabel] = useState("");
 
+  const liveRef = useRef(live);
+  useEffect(() => { liveRef.current = live; }, [live]);
+
   useEffect(() => {
     let active = true;
-    const poll = () =>
+    const poll = () => {
+      if (!liveRef.current) return;
       fetchLiveData().then(({ tokens: t, livePools: p, liveSwaps: s }) => {
         if (!active) return;
         if (t.length) setTokens(t);
         if (p.length) setLivePools(p);
         if (s.length) setLiveSwaps(s);
       });
+    };
     const id = setInterval(poll, 15_000);
     return () => { active = false; clearInterval(id); };
   }, []);
@@ -169,15 +174,21 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   }, [router]);
 
   // Sidebar nav routing
-  const COMING_SOON = new Set(["DEX Pools", "Liquidity Locks", "Contract Analyzer", "Opportunities", "Alerts"]);
+  const COMING_SOON = new Set(["DEX Pools", "Liquidity Locks", "Contract Analyzer", "Opportunities", "Alerts", "Wallet Explorer"]);
 
   const handleNavClick = useCallback((label: string) => {
     if (label === "Launches")                              { router.push("/launches");         return; }
     if (label === "Smart Money")                           { router.push("/smart-money");      return; }
-    if (label === "Top Gainers" || label === "Top Volume") { router.push("/top-gainers");      return; }
+    if (label === "Top Gainers")  { router.push("/top-gainers");          return; }
+    if (label === "Top Volume")   { router.push("/top-gainers?sort=volume"); return; }
     if (label === "Risk Scanner")                          { router.push("/risk-scanner");     return; }
     if (label === "Holder Analysis")                       { router.push("/holder-analysis");  return; }
-    if (label === "Wallet Explorer")                       { router.push("/wallet/explorer");  return; }
+    if (label === "Wallet Explorer") {
+      setComingSoonLabel("Wallet Explorer");
+      setRightPanel("coming-soon");
+      setActiveNav("Wallet Explorer");
+      return;
+    }
     if (COMING_SOON.has(label)) {
       setComingSoonLabel(label);
       setRightPanel("coming-soon");
@@ -211,7 +222,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
             live={live}
             onChainChange={setChain}
             onLiveChange={setLive}
-            onSelect={(t) => { setSelected(t); openTokenPage(t); }}
+            onSelect={showTokenInPanel}
           />
           <section className="lowerGrid" aria-label="Launch intelligence">
             <LatestLaunchesCard tokens={visibleTokens} onSelect={showTokenInPanel} />
@@ -298,6 +309,7 @@ function Sidebar({ activeItem, onNavigate }: { activeItem: string; onNavigate: (
 }
 
 function TrendingTicker({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: (token: RadarToken) => void }) {
+  const router = useRouter();
   const tickerTokens = [...tokens, ...tokens, ...tokens];
   return (
     <section className="trendingTicker" aria-label="Trending tokens">
@@ -314,7 +326,7 @@ function TrendingTicker({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: 
           ))}
         </div>
       </div>
-      <button className="viewAllButton" type="button">View all <ArrowRight size={15} /></button>
+      <button className="viewAllButton" type="button" onClick={() => router.push("/launches")}>View all <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -386,9 +398,9 @@ function LaunchRadar({
           </button>
         ))}
         <div className="radarMetric">
-          <span>Live launches</span>
-          <strong>{tokens.length * 12}</strong>
-          <small>24h</small>
+          <span>Tokens tracked</span>
+          <strong>{tokens.length}</strong>
+          <small>live</small>
         </div>
         <div className="playControls">
           <button className="iconButton" type="button" onClick={() => onLiveChange(!live)} aria-label={live ? "Pause" : "Play"}>
@@ -526,7 +538,7 @@ function TokenDetailPanel({ token, onOpenPage }: { token?: RadarToken; onOpenPag
         <SignalCard label="Smart Money Interest" value={token.smartWalletBuys > 12 ? "High" : "Building"} detail={`${token.smartWalletBuys} wallets`} tone="green" />
         <SignalCard label="Holder Growth (24H)" value={`+${token.holderGrowth.toFixed(1)}%`} detail={`${compact(token.holders)} holders`} tone="green" />
         <SignalCard label="Launch Source" value={token.launchSource} detail={`${token.chain.toUpperCase()} discovery`} tone="cyan" />
-        <SignalCard label="Liquidity Lock" value={`${token.liquidityLocked}%`} detail={token.liquidityLocked > 80 ? "Strong lock" : "Monitor"} tone="green" />
+        <SignalCard label="Est. Lock" value={`${token.liquidityLocked}%`} detail={token.liquidityLocked > 80 ? "Strong lock" : "Monitor"} tone="green" />
       </div>
 
       <button className="primaryAction" type="button" onClick={() => onOpenPage(token)}>
@@ -844,7 +856,6 @@ function RadarInsightsCard({ selected, tokens }: { selected?: RadarToken; tokens
           }
         />
       </div>
-      <button className="panelLink" type="button">View All Insights <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -903,11 +914,18 @@ function LivePoolsCard({ pools, tokens }: { pools: LivePool[]; tokens: RadarToke
 
 function MiniCandlestickChart({ token, candles: realCandles }: { token: RadarToken; candles: Candle[] }) {
   const candles = useMemo(
-    () => realCandles.length
-      ? realCandles.map((c) => ({ open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume }))
-      : makeCandles(token),
-    [realCandles, token],
+    () => realCandles.map((c) => ({ open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })),
+    [realCandles],
   );
+
+  if (!candles.length) {
+    return (
+      <div className="candlePanel" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--faint)", fontSize: 11 }}>
+        No chart data yet — indexer collecting candles
+      </div>
+    );
+  }
+
   const max = Math.max(...candles.map((item) => item.high));
   const min = Math.min(...candles.map((item) => item.low));
   const spread = max - min || 1;
@@ -1033,11 +1051,27 @@ function TokenLogo({ label, tone, large = false }: { label: string; tone: string
 /* ── helpers ── */
 
 function enrichTokens(tokens: TokenSummary[]): RadarToken[] {
-  // Keep dots well inside the circle boundary (max ~72% so they stay on the disc)
-  const seedPositions = [[64, 28], [36, 30], [66, 66], [72, 48], [28, 56], [43, 47], [56, 33], [60, 63]];
   return tokens.map((token, index) => {
     const type = radarType(token, index);
-    const [radarX, radarY] = seedPositions[index % seedPositions.length];
+
+    // Distance from centre = age (inner = newest, outer = oldest)
+    // Rings are labelled 25m / 50m / 75m / 100m — map ageMinutes accordingly.
+    // Keep within 8–68% radius so dots stay inside the disc.
+    const ageClamped = Math.min(token.ageMinutes, 100);
+    const radius = 8 + (ageClamped / 100) * 60; // 8% – 68%
+
+    // Angle: spread tokens evenly around the circle, seeded by address so
+    // the same token always lands at the same angle across refreshes.
+    const addrSeed = parseInt(token.address.slice(-4), 16) / 0xffff; // 0–1
+    const chainOffset = token.chain === "eth" ? 120 : token.chain === "bsc" ? 240 : 0;
+    const angleBase = (index / Math.max(tokens.length, 1)) * 360 + chainOffset;
+    const angleDeg = (angleBase + addrSeed * 40 - 20 + 360) % 360; // ±20° jitter
+    const angleRad = (angleDeg * Math.PI) / 180;
+
+    // Convert polar → CSS percentages (origin = 50%, 50%)
+    const radarX = Math.round(50 + radius * Math.cos(angleRad));
+    const radarY = Math.round(50 + radius * Math.sin(angleRad));
+
     return {
       ...token,
       id: `${token.chain}-${token.address}`,
