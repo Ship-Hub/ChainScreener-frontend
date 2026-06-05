@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import type { Candle, ChainKey, LivePool, LiveSwap, RiskLevel, TokenSummary } from "../lib/types";
 import { fetchLiveData, fetchTokenCandles, fetchTokenSwaps } from "../lib/api";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -309,9 +310,7 @@ function TopNavbar({
   const searchRef = useRef<HTMLInputElement>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [alertsOpen, setAlertsOpen] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // ⌘K / Ctrl+K focuses search
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -322,17 +321,6 @@ function TopNavbar({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
-
-  const connectWallet = useCallback(async () => {
-    if (walletAddress) { setWalletAddress(null); return; }
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const eth = (window as any).ethereum;
-      if (!eth) { alert("MetaMask not found. Install it to connect a wallet."); return; }
-      const [addr] = await eth.request({ method: "eth_requestAccounts" }) as string[];
-      setWalletAddress(addr);
-    } catch { /* user rejected */ }
-  }, [walletAddress]);
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -410,15 +398,42 @@ function TopNavbar({
           <Star size={16} /> Watchlist
         </button>
 
-        {/* Wallet */}
-        <button className="walletButton" type="button" onClick={connectWallet}>
-          <TokenLogo label={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : "0x"} tone="blue" />
-          {walletAddress
-            ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
-            : "Connect Wallet"
-          }
-          <ChevronDown size={15} />
-        </button>
+        {/* RainbowKit wallet connect */}
+        <ConnectButton.Custom>
+          {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
+            const connected = mounted && account && chain;
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {connected && (
+                  <button
+                    className="walletButton"
+                    type="button"
+                    onClick={openChainModal}
+                    title="Switch network"
+                    style={{ padding: "0 8px", gap: 5 }}
+                  >
+                    {chain.hasIcon && chain.iconUrl && (
+                      <img src={chain.iconUrl} alt={chain.name} style={{ width: 16, height: 16, borderRadius: "50%" }} />
+                    )}
+                    {chain.name}
+                  </button>
+                )}
+                <button
+                  className="walletButton"
+                  type="button"
+                  onClick={connected ? openAccountModal : openConnectModal}
+                >
+                  <TokenLogo
+                    label={connected ? account.displayName.slice(0, 2).toUpperCase() : "0x"}
+                    tone="blue"
+                  />
+                  {connected ? account.displayName : "Connect Wallet"}
+                  <ChevronDown size={15} />
+                </button>
+              </div>
+            );
+          }}
+        </ConnectButton.Custom>
       </div>
     </header>
   );
