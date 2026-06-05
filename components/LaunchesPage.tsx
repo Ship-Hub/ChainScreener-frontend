@@ -60,7 +60,10 @@ interface TokenSummary {
 function fmtUsd(v: number): string {
   if (v <= 0) return "—";
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`;
+  if (v >= 1_000) {
+    const k = Math.round(v / 1_000);
+    return k >= 1000 ? `$${(v / 1_000_000).toFixed(2)}M` : `$${k}K`;
+  }
   return `$${v.toFixed(0)}`;
 }
 

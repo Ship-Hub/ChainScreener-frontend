@@ -875,8 +875,14 @@ input:focus-visible {
 .riskBadge.extreme { color: var(--red); background: oklch(0.2 0.055 25 / 0.55); }
 
 .sparkline {
-  width: 64px;
-  height: 24px;
+  width: 48px;
+  height: 20px;
+}
+
+.latestLaunches th:last-child,
+.latestLaunches td:last-child {
+  width: 56px;
+  max-width: 56px;
 }
 
 .sparkline polyline {

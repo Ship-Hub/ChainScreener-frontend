@@ -1092,7 +1092,10 @@ function signedPct(value: number) { return `${value >= 0 ? "+" : ""}${value.toFi
 
 function money(value: number) {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
+  if (value >= 1_000) {
+    const k = Math.round(value / 1_000);
+    return k >= 1000 ? `$${(value / 1_000_000).toFixed(2)}M` : `$${k}K`;
+  }
   return `$${Math.round(value)}`;
 }
 
