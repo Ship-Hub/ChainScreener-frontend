@@ -30,7 +30,7 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import "../app/launches/launches.css";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -99,6 +99,11 @@ function summaryToLaunch(token: TokenSummary, idx: number): TokenLaunch {
     starred: false,
     logoPalette: palettes[idx % palettes.length],
     launchPlatform: token.launchPlatform ?? null,
+    ageMinutes: token.ageMinutes,
+    rawVolume: token.volume24hUsd,
+    rawMcap: token.marketCapUsd,
+    rawChange24h: token.priceChange24h,
+    rawLiquidity: token.liquidityUsd,
   };
 }
 
@@ -110,6 +115,7 @@ type Chain = "base" | "eth" | "bsc" | "arb" | "sol";
 type RiskLevel = "Low" | "Medium" | "High" | "Very High";
 type Tab = "all" | "new-pairs" | "fair-launch" | "presale" | "graduated" | "dex-launch";
 type Timeframe = "5M" | "15M" | "1H" | "6H" | "24H" | "7D";
+type SortMode = "newest" | "volume" | "gainers" | "mcap";
 type ViewMode = "grid" | "list";
 type RiskFilter = "All" | "Low" | "Medium" | "High" | "Scam";
 
@@ -131,6 +137,24 @@ interface TokenLaunch {
   starred: boolean;
   logoPalette: string;
   launchPlatform: string | null;
+  // Raw numeric fields for client-side filtering & sorting
+  ageMinutes: number;
+  rawVolume: number;
+  rawMcap: number;
+  rawChange24h: number;
+  rawLiquidity: number;
+}
+
+// Chain → block explorer base URL
+function explorerUrl(chain: string, address: string): string {
+  const bases: Record<string, string> = {
+    base: "https://basescan.org/address/",
+    eth:  "https://etherscan.io/address/",
+    bsc:  "https://bscscan.com/address/",
+    arb:  "https://arbiscan.io/address/",
+    sol:  "https://solscan.io/account/",
+  };
+  return `${bases[chain] ?? "https://basescan.org/address/"}${address}`;
 }
 
 
@@ -266,29 +290,64 @@ function MiniSparkline({ tone }: { tone: "green" | "amber" | "red" }) {
    Top Navbar
 ══════════════════════════════════════════════════════════ */
 
-function TopNavbar() {
+function TopNavbar({
+  searchQuery,
+  onSearchChange,
+  alertCount,
+}: {
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  alertCount: number;
+}) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); searchRef.current?.focus(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const connectWallet = useCallback(async () => {
+    if (walletAddress) { setWalletAddress(null); return; }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eth = (window as any).ethereum;
+      if (!eth) { alert("MetaMask not found."); return; }
+      const [addr] = await eth.request({ method: "eth_requestAccounts" }) as string[];
+      setWalletAddress(addr);
+    } catch { /* user rejected */ }
+  }, [walletAddress]);
+
   return (
     <header className="topNavbar">
       <div className="brandLockup">
-        <span className="brandOrb">
-          <Radar size={22} />
-        </span>
-        <div>
-          <strong>Chain Screener</strong>
-          <span>Launch radar</span>
-        </div>
+        <span className="brandOrb"><Radar size={22} /></span>
+        <div><strong>Chain Screener</strong><span>Launch radar</span></div>
       </div>
       <label className="commandSearch">
         <Search size={18} />
-        <input placeholder="Search token, wallet, contract, or address..." />
+        <input
+          ref={searchRef}
+          placeholder="Search token, wallet, contract, or address..."
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
+        />
         <kbd>⌘ K</kbd>
       </label>
       <div className="topActions">
         <button className="topButton" type="button">
-          <Bell size={16} /> Alerts <span>12</span>
+          <Bell size={16} /> Alerts {alertCount > 0 && <span>{alertCount}</span>}
         </button>
-        <button className="topButton" type="button">
-          <Star size={16} /> Watchlist
+        <button className="topButton" type="button"><Star size={16} /> Watchlist</button>
+        <button className="walletButton" type="button" onClick={connectWallet}>
+          <span style={{ width: 22, height: 22, borderRadius: "50%", background: "oklch(0.22 0.07 260)", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800, color: "oklch(0.78 0.14 260)" }}>
+            {walletAddress ? walletAddress.slice(2, 4).toUpperCase() : "0x"}
+          </span>
+          {walletAddress ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}` : "Connect Wallet"}
+          <ChevronDown size={15} />
         </button>
       </div>
     </header>
@@ -419,52 +478,51 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "dex-launch", label: "DEX Launch" },
 ];
 
+const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
+  { value: "newest",  label: "Newest" },
+  { value: "volume",  label: "Volume" },
+  { value: "gainers", label: "Top Gainers" },
+  { value: "mcap",    label: "Market Cap" },
+];
+
 function TabBar({
-  active,
-  onTabChange,
-  view,
-  onViewChange,
+  active, onTabChange, view, onViewChange, sort, onSortChange,
 }: {
-  active: Tab;
-  onTabChange: (t: Tab) => void;
-  view: ViewMode;
-  onViewChange: (v: ViewMode) => void;
+  active: Tab; onTabChange: (t: Tab) => void;
+  view: ViewMode; onViewChange: (v: ViewMode) => void;
+  sort: SortMode; onSortChange: (s: SortMode) => void;
 }) {
+  const [sortOpen, setSortOpen] = useState(false);
+  const currentLabel = SORT_OPTIONS.find(o => o.value === sort)?.label ?? "Newest";
+
   return (
     <div className="lpTabBar">
       <div className="lpTabGroup">
         {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            className={`lpTab ${active === tab.id ? "lpTabActive" : ""}`}
-            type="button"
-            onClick={() => onTabChange(tab.id)}
-          >
+          <button key={tab.id} className={`lpTab ${active === tab.id ? "lpTabActive" : ""}`} type="button" onClick={() => onTabChange(tab.id)}>
             {tab.label}
           </button>
         ))}
       </div>
       <div className="lpTabRight">
-        <button className="lpSortSelect" type="button">
-          Newest <ChevronDown size={13} />
-        </button>
+        <div style={{ position: "relative" }}>
+          <button className="lpSortSelect" type="button" onClick={() => setSortOpen(o => !o)}>
+            {currentLabel} <ChevronDown size={13} />
+          </button>
+          {sortOpen && (
+            <div className="radarDropdown" style={{ minWidth: 140 }} onMouseLeave={() => setSortOpen(false)}>
+              {SORT_OPTIONS.map(({ value, label }) => (
+                <button key={value} type="button" className={`radarDropdownItem ${sort === value ? "selected" : ""}`}
+                  onClick={() => { onSortChange(value); setSortOpen(false); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="lpViewToggle">
-          <button
-            className={view === "grid" ? "lpViewActive" : ""}
-            type="button"
-            aria-label="Grid view"
-            onClick={() => onViewChange("grid")}
-          >
-            <Grid size={14} />
-          </button>
-          <button
-            className={view === "list" ? "lpViewActive" : ""}
-            type="button"
-            aria-label="List view"
-            onClick={() => onViewChange("list")}
-          >
-            <List size={14} />
-          </button>
+          <button className={view === "grid" ? "lpViewActive" : ""} type="button" aria-label="Grid view" onClick={() => onViewChange("grid")}><Grid size={14} /></button>
+          <button className={view === "list" ? "lpViewActive" : ""} type="button" aria-label="List view" onClick={() => onViewChange("list")}><List size={14} /></button>
         </div>
       </div>
     </div>
@@ -476,17 +534,17 @@ function TabBar({
 ══════════════════════════════════════════════════════════ */
 
 function TokenTable({
-  tokens,
-  onRowClick,
+  tokens, onRowClick, starred, onToggleStar, onChartClick,
 }: {
   tokens: TokenLaunch[];
   onRowClick: (token: TokenLaunch) => void;
+  starred: Record<string, boolean>;
+  onToggleStar: (id: string) => void;
+  onChartClick: (token: TokenLaunch) => void;
 }) {
-  const [starred, setStarred] = useState<Record<string, boolean>>({});
-
   const toggleStar = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    setStarred((prev) => ({ ...prev, [id]: !prev[id] }));
+    onToggleStar(id);
   };
 
   return (
@@ -597,7 +655,7 @@ function TokenTable({
                   </button>
                   <a
                     className="lpActionBtn"
-                    href={`https://basescan.org/address/${token.address}`}
+                    href={explorerUrl(token.chain, token.address)}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="View on explorer"
@@ -606,7 +664,8 @@ function TokenTable({
                   >
                     <ExternalLink size={12} />
                   </a>
-                  <button className="lpActionBtn" type="button" aria-label="View chart">
+                  <button className="lpActionBtn" type="button" aria-label="View chart"
+                    onClick={(e) => { e.stopPropagation(); onChartClick(token); }}>
                     <BarChart2 size={12} />
                   </button>
                 </div>
@@ -615,6 +674,52 @@ function TokenTable({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function GridView({
+  tokens, onRowClick, starred, onToggleStar,
+}: {
+  tokens: TokenLaunch[];
+  onRowClick: (token: TokenLaunch) => void;
+  starred: Record<string, boolean>;
+  onToggleStar: (id: string) => void;
+}) {
+  return (
+    <div className="lpGridView">
+      {tokens.map(token => (
+        <button key={token.id} className="lpGridCard" type="button" onClick={() => onRowClick(token)}>
+          <div className="lpGridCardHead">
+            <span className={`lpTokenLogo ${token.logoPalette}`}>{token.symbol.slice(0, 2).toUpperCase()}</span>
+            <div className="lpGridCardTitle">
+              <strong>{token.symbol}</strong>
+              <span>{token.pair}</span>
+            </div>
+            <button
+              className={`lpStarBtn ${starred[token.id] ? "lpStarred" : ""}`}
+              type="button"
+              onClick={e => { e.stopPropagation(); onToggleStar(token.id); }}
+              aria-label="Star"
+            >
+              <Star size={13} fill={starred[token.id] ? "currentColor" : "none"} />
+            </button>
+          </div>
+          <div className="lpGridCardRow">
+            <span className={`lpChainBadge ${token.chain}`}>{token.chain === "eth" ? "ETH" : token.chain.toUpperCase()}</span>
+            <RiskBadge level={token.risk} />
+          </div>
+          <div className="lpGridCardStats">
+            <div><span>MCap</span><strong>{token.marketCap}</strong></div>
+            <div><span>Vol 24H</span><strong>{token.volume24h}</strong></div>
+            <div><span>Liq</span><strong>{token.liquidity}</strong></div>
+          </div>
+          <div className="lpGridCardFoot">
+            <SmartScoreGauge score={token.smartScore} />
+            <span style={{ color: "var(--faint)", fontSize: 11 }}>{token.age}</span>
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
@@ -785,61 +890,68 @@ function HotAlertsBand({ rawTokens }: { rawTokens: TokenSummary[] }) {
    Right panel: Filters
 ══════════════════════════════════════════════════════════ */
 
-function FiltersPanel() {
-  const [riskFilter, setRiskFilter] = useState<RiskFilter>("Low");
-  const [hideScams, setHideScams] = useState(true);
+interface FilterState {
+  riskLevels: Set<string>;
+  minLiquidity: number;
+  hideScams: boolean;
+  chain: string;
+}
 
-  const riskOptions: RiskFilter[] = ["All", "Low", "Medium", "High", "Scam"];
+function FiltersPanel({
+  filterState, onFilterChange, onReset,
+}: {
+  filterState: FilterState;
+  onFilterChange: (next: Partial<FilterState>) => void;
+  onReset: () => void;
+}) {
+  const [minLiqInput, setMinLiqInput] = useState(filterState.minLiquidity > 0 ? String(filterState.minLiquidity) : "");
+  const chainOptions = ["all", "base", "eth", "bsc"];
+  const riskOptions: Array<{ value: string; label: string }> = [
+    { value: "Low", label: "Low" }, { value: "Medium", label: "Medium" },
+    { value: "High", label: "High" }, { value: "Very High", label: "Very High" },
+  ];
+
+  const activeCount = (filterState.riskLevels.size > 0 ? 1 : 0) +
+    (filterState.minLiquidity > 0 ? 1 : 0) +
+    (filterState.hideScams ? 1 : 0) +
+    (filterState.chain !== "all" ? 1 : 0);
+
+  const toggleRisk = (value: string) => {
+    const next = new Set(filterState.riskLevels);
+    next.has(value) ? next.delete(value) : next.add(value);
+    onFilterChange({ riskLevels: next });
+  };
 
   return (
     <div className="lpFilterPanel">
       <div className="lpPanelHead">
-        <h3>Filters</h3>
-        <button className="lpPanelResetLink" type="button">
-          Reset
-        </button>
+        <h3>Filters {activeCount > 0 && <span style={{ color: "var(--cyan)", fontWeight: 700 }}>({activeCount})</span>}</h3>
+        <button className="lpPanelResetLink" type="button" onClick={onReset}>Reset</button>
       </div>
       <div className="lpPanelBody">
-        {/* Time Range */}
-        <div className="lpFilterRow">
-          <label className="lpFilterLabel">
-            Time Range <span className="lpInfoIcon">i</span>
-          </label>
-          <button className="lpFilterSelect" type="button">
-            24 Hours <ChevronDown size={14} />
-          </button>
-        </div>
-
         {/* Chain */}
         <div className="lpFilterRow">
-          <label className="lpFilterLabel">
-            Chain <span className="lpInfoIcon">i</span>
-          </label>
-          <button className="lpFilterSelect" type="button">
-            All Chains <ChevronDown size={14} />
-          </button>
-        </div>
-
-        {/* Launch Type */}
-        <div className="lpFilterRow">
-          <label className="lpFilterLabel">Launch Type</label>
-          <button className="lpFilterSelect" type="button">
-            All Types <ChevronDown size={14} />
-          </button>
+          <label className="lpFilterLabel">Chain <Info size={11} className="lpInfoIcon" /></label>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {chainOptions.map(c => (
+              <button key={c} type="button"
+                className={`lpRiskBtn ${filterState.chain === c ? "lpRiskActive" : ""}`}
+                onClick={() => onFilterChange({ chain: c })}>
+                {c === "all" ? "All" : c.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Risk Level */}
         <div className="lpFilterRow">
           <label className="lpFilterLabel">Risk Level</label>
           <div className="lpRiskGroup">
-            {riskOptions.map((opt) => (
-              <button
-                key={opt}
-                className={`lpRiskBtn ${riskFilter === opt ? "lpRiskActive" : ""}`}
-                type="button"
-                onClick={() => setRiskFilter(opt)}
-              >
-                {opt}
+            {riskOptions.map(({ value, label }) => (
+              <button key={value} type="button"
+                className={`lpRiskBtn ${filterState.riskLevels.has(value) ? "lpRiskActive" : ""}`}
+                onClick={() => toggleRisk(value)}>
+                {label}
               </button>
             ))}
           </div>
@@ -850,25 +962,26 @@ function FiltersPanel() {
           <label className="lpFilterLabel">Min. Liquidity</label>
           <div className="lpMinLiqInput">
             <span>$</span>
-            <input type="number" placeholder="0" min={0} />
+            <input
+              type="number" placeholder="0" min={0} value={minLiqInput}
+              onChange={e => setMinLiqInput(e.target.value)}
+              onBlur={() => onFilterChange({ minLiquidity: Number(minLiqInput) || 0 })}
+            />
           </div>
         </div>
 
-        {/* Hide known scams */}
+        {/* Hide scams */}
         <div className="lpToggleRow">
-          <span className="lpToggleLabel">Hide known scams</span>
+          <span className="lpToggleLabel">Hide Very High Risk</span>
           <button
-            className={`lpToggle ${hideScams ? "lpToggleOn" : ""}`}
-            type="button"
-            role="switch"
-            aria-checked={hideScams}
-            onClick={() => setHideScams((v) => !v)}
+            className={`lpToggle ${filterState.hideScams ? "lpToggleOn" : ""}`}
+            type="button" role="switch" aria-checked={filterState.hideScams}
+            onClick={() => onFilterChange({ hideScams: !filterState.hideScams })}
           />
         </div>
 
-        {/* Apply */}
-        <button className="lpApplyBtn" type="button">
-          <Filter size={14} /> Apply Filters (3)
+        <button className="lpApplyBtn" type="button" style={{ opacity: activeCount > 0 ? 1 : 0.5 }}>
+          <Filter size={14} /> {activeCount > 0 ? `Active Filters (${activeCount})` : "No Filters Applied"}
         </button>
       </div>
     </div>
@@ -945,39 +1058,63 @@ function LaunchTrendsPanel({ rawTokens }: { rawTokens: TokenSummary[] }) {
    Right panel: Launch Quality donut
 ══════════════════════════════════════════════════════════ */
 
-function LaunchQualityPanel() {
+function LaunchQualityPanel({ rawTokens }: { rawTokens: TokenSummary[] }) {
+  const total = rawTokens.length || 1;
+  const low     = rawTokens.filter(t => t.riskLevel === "Low").length;
+  const medium  = rawTokens.filter(t => t.riskLevel === "Medium").length;
+  const high    = rawTokens.filter(t => t.riskLevel === "High").length;
+  const extreme = rawTokens.filter(t => t.riskLevel === "Extreme" || t.riskScore > 75).length;
+
+  const pct = (n: number) => ((n / total) * 100).toFixed(1);
+  const lowP = parseFloat(pct(low));
+  const medP = parseFloat(pct(medium));
+  const hiP  = parseFloat(pct(high));
+  const exP  = parseFloat(pct(extreme));
+
+  // Build conic-gradient stops
+  const stops = [
+    { color: "var(--green)",  end: lowP },
+    { color: "var(--amber)",  end: lowP + medP },
+    { color: "var(--orange)", end: lowP + medP + hiP },
+    { color: "var(--red)",    end: 100 },
+  ];
+  const conicStops = stops.reduce<string[]>((acc, s, i) => {
+    const prev = i === 0 ? 0 : stops[i - 1].end;
+    if (s.end > prev) acc.push(`${s.color} ${prev}% ${s.end}%`);
+    return acc;
+  }, []).join(", ");
+
   return (
     <div className="lpQualityPanel">
       <div className="lpPanelHead">
         <h3>Launch Quality</h3>
-        <button className="lpDropdownBtn" type="button">
-          24H <ChevronDown size={12} />
-        </button>
       </div>
       <div className="lpQualityBody">
-        <div className="lpQualityDonut" aria-label="Launch quality distribution" />
-        <div className="lpQualityLegend">
-          <div className="lpLegendItem">
-            <span className="lpLegendDot" style={{ background: "var(--green)" }} />
-            <span className="lpLegendLabel">Low Risk</span>
-            <span className="lpLegendPct">58.3%</span>
-          </div>
-          <div className="lpLegendItem">
-            <span className="lpLegendDot" style={{ background: "var(--amber)" }} />
-            <span className="lpLegendLabel">Medium Risk</span>
-            <span className="lpLegendPct">21.4%</span>
-          </div>
-          <div className="lpLegendItem">
-            <span className="lpLegendDot" style={{ background: "var(--orange)" }} />
-            <span className="lpLegendLabel">High Risk</span>
-            <span className="lpLegendPct">10.3%</span>
-          </div>
-          <div className="lpLegendItem">
-            <span className="lpLegendDot" style={{ background: "var(--red)" }} />
-            <span className="lpLegendLabel">Scam Risk</span>
-            <span className="lpLegendPct">10.0%</span>
-          </div>
-        </div>
+        {rawTokens.length === 0 ? (
+          <div style={{ color: "var(--faint)", fontSize: 12 }}>No data yet</div>
+        ) : (
+          <>
+            <div
+              className="lpQualityDonut"
+              aria-label="Launch quality distribution"
+              style={{ background: `radial-gradient(circle, oklch(0.12 0.018 255) 0 54%, transparent 55%), conic-gradient(${conicStops || "var(--faint) 0% 100%"})` }}
+            />
+            <div className="lpQualityLegend">
+              {[
+                { color: "var(--green)",  label: "Low Risk",    p: lowP },
+                { color: "var(--amber)",  label: "Medium Risk", p: medP },
+                { color: "var(--orange)", label: "High Risk",   p: hiP  },
+                { color: "var(--red)",    label: "Extreme",     p: exP  },
+              ].map(({ color, label, p }) => (
+                <div className="lpLegendItem" key={label}>
+                  <span className="lpLegendDot" style={{ background: color }} />
+                  <span className="lpLegendLabel">{label}</span>
+                  <span className="lpLegendPct">{p.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1019,38 +1156,115 @@ function TopByMcap({ rawTokens }: { rawTokens: TokenSummary[] }) {
    Main LaunchesPage export
 ══════════════════════════════════════════════════════════ */
 
+const TF_MINUTES: Record<Timeframe, number> = {
+  "5M": 5, "15M": 15, "1H": 60, "6H": 360, "24H": 1440, "7D": 100_000,
+};
+
+const DEFAULT_FILTER: FilterState = {
+  riskLevels: new Set(),
+  minLiquidity: 0,
+  hideScams: false,
+  chain: "all",
+};
+
 export function LaunchesPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>("24H");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sort, setSort] = useState<SortMode>("newest");
+  const [displayLimit, setDisplayLimit] = useState(20);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterState, setFilterState] = useState<FilterState>(DEFAULT_FILTER);
   const [rawTokens, setRawTokens] = useState<TokenSummary[]>([]);
   const [platformTokens, setPlatformTokens] = useState<Record<string, TokenSummary[]>>({});
   const [loading, setLoading] = useState(true);
+  const [alertCount, setAlertCount] = useState(0);
+
+  // Starred — localStorage persistence
+  const [starred, setStarred] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try { const s = localStorage.getItem("cs:launches:starred"); if (s) setStarred(JSON.parse(s)); } catch {}
+  }, []);
+  const toggleStar = useCallback((id: string) => {
+    setStarred(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem("cs:launches:starred", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   const timeframes: Timeframe[] = ["5M", "15M", "1H", "6H", "24H", "7D"];
 
   useEffect(() => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
     setLoading(true);
-
-    // Fetch all launches + per-platform strips in parallel
     Promise.all([
       fetch(`${api}/api/launches`).then(r => r.json()),
       fetch(`${api}/api/launches/by-platform`).then(r => r.json()),
+      fetch(`${api}/api/alerts/counts`).then(r => r.json()).catch(() => ({ data: {} })),
     ])
-      .then(([launchData, platformData]) => {
+      .then(([launchData, platformData, alertData]) => {
         setRawTokens(launchData.data ?? []);
         setPlatformTokens(platformData ?? {});
+        const counts = alertData.data ?? alertData ?? {};
+        setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  // Map raw TokenSummary → TokenLaunch for the table
-  const launches: TokenLaunch[] = rawTokens.map(summaryToLaunch);
+  const allLaunches = useMemo(() => rawTokens.map(summaryToLaunch), [rawTokens]);
 
-  // Compute stats from real data
+  // Full filtered + sorted list
+  const filteredLaunches = useMemo(() => {
+    let list = allLaunches;
+
+    // Timeframe
+    const maxAge = TF_MINUTES[activeTimeframe];
+    list = list.filter(t => t.ageMinutes <= maxAge);
+
+    // Tab
+    if (activeTab === "new-pairs")   list = list.filter(t => t.ageMinutes < 120);
+    if (activeTab === "fair-launch") list = list.filter(t => !t.launchPlatform);
+    if (activeTab === "graduated")   list = list.filter(t => t.ageMinutes > 1440);
+    // presale / dex-launch: coming soon — show empty
+
+    // Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(t =>
+        t.symbol.toLowerCase().includes(q) ||
+        t.name.toLowerCase().includes(q) ||
+        t.address.toLowerCase().includes(q),
+      );
+    }
+
+    // Risk levels
+    if (filterState.riskLevels.size > 0)
+      list = list.filter(t => filterState.riskLevels.has(t.risk));
+
+    // Hide very high risk
+    if (filterState.hideScams) list = list.filter(t => t.risk !== "Very High");
+
+    // Min liquidity
+    if (filterState.minLiquidity > 0) list = list.filter(t => t.rawLiquidity >= filterState.minLiquidity);
+
+    // Chain
+    if (filterState.chain !== "all") list = list.filter(t => t.chain === filterState.chain);
+
+    // Sort
+    if (sort === "volume")  list = [...list].sort((a, b) => b.rawVolume - a.rawVolume);
+    if (sort === "gainers") list = [...list].sort((a, b) => b.rawChange24h - a.rawChange24h);
+    if (sort === "mcap")    list = [...list].sort((a, b) => b.rawMcap - a.rawMcap);
+    if (sort === "newest")  list = [...list].sort((a, b) => a.ageMinutes - b.ageMinutes);
+
+    return list;
+  }, [allLaunches, activeTab, activeTimeframe, searchQuery, filterState, sort]);
+
+  const displayedLaunches = filteredLaunches.slice(0, displayLimit);
+  const hasMore = filteredLaunches.length > displayLimit;
+
   const stats: LaunchStats = {
     total: rawTokens.length,
     safe: rawTokens.filter(t => t.riskLevel === "Low").length,
@@ -1060,24 +1274,27 @@ export function LaunchesPage() {
     avgAgeMinutes: rawTokens.length > 0 ? Math.round(rawTokens.reduce((s, t) => s + t.ageMinutes, 0) / rawTokens.length) : 0,
   };
 
-  const handleRowClick = (token: TokenLaunch) => {
-    router.push(`/token/${token.chain}/${token.address}`);
-  };
+  const handleRowClick = (token: TokenLaunch) => router.push(`/token/${token.chain}/${token.address}`);
+  const handlePlatformTokenClick = (address: string, chain: string) => router.push(`/token/${chain}/${address}`);
 
-  const handlePlatformTokenClick = (address: string, chain: string) => {
-    router.push(`/token/${chain}/${address}`);
-  };
+  const updateFilter = useCallback((partial: Partial<FilterState>) => {
+    setFilterState(prev => ({ ...prev, ...partial }));
+    setDisplayLimit(20); // reset pagination on filter change
+  }, []);
+
+  const resetFilters = useCallback(() => {
+    setFilterState(DEFAULT_FILTER);
+    setDisplayLimit(20);
+  }, []);
+
+  const isComingSoon = activeTab === "presale" || activeTab === "dex-launch";
 
   return (
     <div className="appShell">
-      <TopNavbar />
+      <TopNavbar searchQuery={searchQuery} onSearchChange={q => { setSearchQuery(q); setDisplayLimit(20); }} alertCount={alertCount} />
       <div className="lpShell">
-        {/* ── Sidebar ── */}
         <Sidebar />
-
-        {/* ── Main content ── */}
         <main className="lpMain">
-          {/* Page header */}
           <div className="lpHeader">
             <div className="lpHeaderLeft">
               <h1>Launches</h1>
@@ -1085,12 +1302,8 @@ export function LaunchesPage() {
             </div>
             <div className="lpTimeframeGroup">
               {timeframes.map((tf) => (
-                <button
-                  key={tf}
-                  className={`${activeTimeframe === tf ? "lpTfActive" : ""}`}
-                  type="button"
-                  onClick={() => setActiveTimeframe(tf)}
-                >
+                <button key={tf} className={activeTimeframe === tf ? "lpTfActive" : ""} type="button"
+                  onClick={() => { setActiveTimeframe(tf); setDisplayLimit(20); }}>
                   {tf}
                 </button>
               ))}
@@ -1100,62 +1313,50 @@ export function LaunchesPage() {
             </div>
           </div>
 
-          {/* Stat cards */}
           <StatCards stats={stats} />
 
-          {/* ── Platform sections (Clanker / Bankr) ── */}
           {(platformTokens.clanker?.length > 0 || platformTokens.bankr?.length > 0) && (
             <div className="lpPlatformSections">
-              <PlatformSection
-                platformKey="clanker"
-                tokens={platformTokens.clanker ?? []}
-                onTokenClick={handlePlatformTokenClick}
-              />
-              <PlatformSection
-                platformKey="bankr"
-                tokens={platformTokens.bankr ?? []}
-                onTokenClick={handlePlatformTokenClick}
-              />
+              <PlatformSection platformKey="clanker" tokens={platformTokens.clanker ?? []} onTokenClick={handlePlatformTokenClick} />
+              <PlatformSection platformKey="bankr"   tokens={platformTokens.bankr   ?? []} onTokenClick={handlePlatformTokenClick} />
             </div>
           )}
 
-          {/* Tab bar */}
-          <TabBar
-            active={activeTab}
-            onTabChange={setActiveTab}
-            view={viewMode}
-            onViewChange={setViewMode}
-          />
+          <TabBar active={activeTab} onTabChange={t => { setActiveTab(t); setDisplayLimit(20); }}
+            view={viewMode} onViewChange={setViewMode} sort={sort} onSortChange={setSort} />
 
-          {/* Token table */}
           {loading ? (
-            <div style={{ padding: "32px 0", textAlign: "center", color: "var(--faint)", fontSize: 13 }}>
-              Loading launches…
+            <div style={{ padding: "32px 0", textAlign: "center", color: "var(--faint)", fontSize: 13 }}>Loading launches…</div>
+          ) : isComingSoon ? (
+            <div style={{ padding: "48px 0", textAlign: "center", color: "var(--faint)", fontSize: 13 }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
+              <strong style={{ color: "var(--muted)" }}>Coming Soon</strong>
+              <p style={{ margin: "8px 0 0", fontSize: 12 }}>This tab requires additional indexer data</p>
             </div>
-          ) : launches.length === 0 ? (
+          ) : displayedLaunches.length === 0 ? (
             <div style={{ padding: "32px 0", textAlign: "center", color: "var(--faint)", fontSize: 13 }}>
-              No launches indexed yet — run the indexer to populate
+              {allLaunches.length === 0 ? "No launches indexed yet — run the indexer to populate" : "No tokens match the current filters"}
             </div>
+          ) : viewMode === "grid" ? (
+            <GridView tokens={displayedLaunches} onRowClick={handleRowClick} starred={starred} onToggleStar={toggleStar} />
           ) : (
-            <TokenTable tokens={launches} onRowClick={handleRowClick} />
+            <TokenTable tokens={displayedLaunches} onRowClick={handleRowClick}
+              starred={starred} onToggleStar={toggleStar} onChartClick={handleRowClick} />
           )}
 
-          {/* Load more */}
-          {launches.length > 0 && (
-            <button className="lpLoadMore" type="button">
-              Load more ↓
+          {hasMore && (
+            <button className="lpLoadMore" type="button" onClick={() => setDisplayLimit(l => l + 20)}>
+              Load {Math.min(20, filteredLaunches.length - displayLimit)} more ↓
             </button>
           )}
 
-          {/* Live alerts band */}
           <HotAlertsBand rawTokens={rawTokens} />
         </main>
 
-        {/* ── Right panel ── */}
         <aside className="lpRightPanel">
-          <FiltersPanel />
+          <FiltersPanel filterState={filterState} onFilterChange={updateFilter} onReset={resetFilters} />
           <LaunchTrendsPanel rawTokens={rawTokens} />
-          <LaunchQualityPanel />
+          <LaunchQualityPanel rawTokens={rawTokens} />
           <TopByMcap rawTokens={rawTokens} />
         </aside>
       </div>
