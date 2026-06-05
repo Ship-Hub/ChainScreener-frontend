@@ -1,7 +1,29 @@
-node_modules
-.next
-out
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+
+# Environment
 .env
 .env.*
 !.env.example
+
+# Logs
 npm-debug.log*
+*.log
+.next-dev-*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
