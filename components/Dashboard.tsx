@@ -135,10 +135,27 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   const [liveSwaps, setLiveSwaps] = useState(initialLiveSwaps);
   const [chain, setChain] = useState<"all" | ChainKey>("all");
   const [live, setLive] = useState(true);
+  const [speed, setSpeed] = useState<0.5 | 1 | 2 | 5>(1);
+  const [filterRisks, setFilterRisks] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const [rightPanel, setRightPanel] = useState<RightPanel>("token");
   const [activeNav, setActiveNav] = useState("Radar");
   const [comingSoonLabel, setComingSoonLabel] = useState("");
 
+  // Starred tokens — persisted to localStorage
+  const [starred, setStarred] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try { const s = localStorage.getItem("cs:starred"); if (s) setStarred(JSON.parse(s)); } catch {}
+  }, []);
+  const toggleStar = useCallback((id: string) => {
+    setStarred(prev => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem("cs:starred", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  // Polling — respects live flag and speed
   const liveRef = useRef(live);
   useEffect(() => { liveRef.current = live; }, [live]);
 
@@ -153,64 +170,77 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
         if (s.length) setLiveSwaps(s);
       });
     };
-    const id = setInterval(poll, 15_000);
+    const id = setInterval(poll, Math.round(15_000 / speed));
     return () => { active = false; clearInterval(id); };
-  }, []);
+  }, [speed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const radarTokens = useMemo(() => enrichTokens(tokens), [tokens]);
   const trendingTokens = useMemo(() => enrichTokens(tokens.length ? tokens : initialTrending), [tokens, initialTrending]);
   const [selected, setSelected] = useState<RadarToken | undefined>(radarTokens[0]);
 
-  // Show token in right panel without navigating
   const showTokenInPanel = useCallback((token: RadarToken) => {
     setSelected(token);
     setRightPanel("token");
     setActiveNav("Radar");
   }, []);
 
-  // Navigate to full token page
   const openTokenPage = useCallback((token: RadarToken) => {
     router.push(`/token/${token.chain}/${token.address}`);
   }, [router]);
 
-  // Sidebar nav routing
+  const openWatchlist = useCallback(() => {
+    setRightPanel("watchlist");
+    setActiveNav("Watchlist");
+  }, []);
+
   const COMING_SOON = new Set(["DEX Pools", "Liquidity Locks", "Contract Analyzer", "Opportunities", "Alerts", "Wallet Explorer"]);
 
   const handleNavClick = useCallback((label: string) => {
-    if (label === "Launches")                              { router.push("/launches");         return; }
-    if (label === "Smart Money")                           { router.push("/smart-money");      return; }
-    if (label === "Top Gainers")  { router.push("/top-gainers");          return; }
-    if (label === "Top Volume")   { router.push("/top-gainers?sort=volume"); return; }
-    if (label === "Risk Scanner")                          { router.push("/risk-scanner");     return; }
-    if (label === "Holder Analysis")                       { router.push("/holder-analysis");  return; }
-    if (label === "Wallet Explorer") {
-      setComingSoonLabel("Wallet Explorer");
-      setRightPanel("coming-soon");
-      setActiveNav("Wallet Explorer");
-      return;
-    }
+    if (label === "Launches")       { router.push("/launches");              return; }
+    if (label === "Smart Money")    { router.push("/smart-money");           return; }
+    if (label === "Top Gainers")    { router.push("/top-gainers");           return; }
+    if (label === "Top Volume")     { router.push("/top-gainers?sort=volume"); return; }
+    if (label === "Risk Scanner")   { router.push("/risk-scanner");          return; }
+    if (label === "Holder Analysis"){ router.push("/holder-analysis");       return; }
     if (COMING_SOON.has(label)) {
       setComingSoonLabel(label);
       setRightPanel("coming-soon");
       setActiveNav(label);
       return;
     }
-    if (label === "Watchlist") { setRightPanel("watchlist"); setActiveNav("Watchlist"); return; }
+    if (label === "Watchlist") { openWatchlist(); return; }
     if (label === "Radar")     { setRightPanel("token"); }
     setActiveNav(label);
-  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router, openWatchlist]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleTokens = useMemo(
-    () => radarTokens.filter((t) => chain === "all" || t.chain === chain),
-    [chain, radarTokens],
-  );
+  const visibleTokens = useMemo(() => {
+    let list = radarTokens.filter(t => chain === "all" || t.chain === chain);
+    if (filterRisks.size > 0) list = list.filter(t => filterRisks.has(t.riskLevel));
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(t =>
+        t.ticker.toLowerCase().includes(q) ||
+        t.name.toLowerCase().includes(q) ||
+        t.address.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [radarTokens, chain, filterRisks, searchQuery]);
+
   const selectedToken = selected && visibleTokens.some((t) => t.address === selected.address)
     ? selected
     : visibleTokens[0];
 
   return (
     <AppShell>
-      <TopNavbar alertCount={alertCount} />
+      <TopNavbar
+        alertCount={alertCount}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchTokens={radarTokens}
+        onSearchSelect={showTokenInPanel}
+        onWatchlistClick={openWatchlist}
+      />
       <TrendingTicker tokens={trendingTokens} onSelect={showTokenInPanel} />
       <div className="dashboardGrid">
         <Sidebar activeItem={activeNav} onNavigate={handleNavClick} />
@@ -220,8 +250,12 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
             selected={selectedToken}
             chain={chain}
             live={live}
+            speed={speed}
+            filterRisks={filterRisks}
             onChainChange={setChain}
             onLiveChange={setLive}
+            onSpeedChange={setSpeed}
+            onFilterChange={setFilterRisks}
             onSelect={showTokenInPanel}
           />
           <section className="lowerGrid" aria-label="Launch intelligence">
@@ -235,7 +269,13 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
           ? <WatchlistPanel onClose={() => { setRightPanel("token"); setActiveNav("Radar"); }} />
           : rightPanel === "coming-soon"
           ? <ComingSoonPanel label={comingSoonLabel} onClose={() => { setRightPanel("token"); setActiveNav("Radar"); }} />
-          : <TokenDetailPanel token={selectedToken} onOpenPage={openTokenPage} />
+          : <TokenDetailPanel
+              token={selectedToken}
+              onOpenPage={openTokenPage}
+              onClose={() => setSelected(undefined)}
+              starred={starred}
+              onToggleStar={toggleStar}
+            />
         }
       </div>
     </AppShell>
@@ -251,7 +291,57 @@ function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TopNavbar({ alertCount }: { alertCount: number }) {
+function TopNavbar({
+  alertCount,
+  searchQuery,
+  onSearchChange,
+  searchTokens,
+  onSearchSelect,
+  onWatchlistClick,
+}: {
+  alertCount: number;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  searchTokens: RadarToken[];
+  onSearchSelect: (t: RadarToken) => void;
+  onWatchlistClick: () => void;
+}) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  // ⌘K / Ctrl+K focuses search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const connectWallet = useCallback(async () => {
+    if (walletAddress) { setWalletAddress(null); return; }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eth = (window as any).ethereum;
+      if (!eth) { alert("MetaMask not found. Install it to connect a wallet."); return; }
+      const [addr] = await eth.request({ method: "eth_requestAccounts" }) as string[];
+      setWalletAddress(addr);
+    } catch { /* user rejected */ }
+  }, [walletAddress]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return searchTokens
+      .filter(t => t.ticker.toLowerCase().includes(q) || t.name.toLowerCase().includes(q) || t.address.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [searchQuery, searchTokens]);
+
   return (
     <header className="topNavbar">
       <div className="brandLockup">
@@ -261,15 +351,74 @@ function TopNavbar({ alertCount }: { alertCount: number }) {
           <span>Launch radar</span>
         </div>
       </div>
-      <label className="commandSearch">
-        <Search size={18} />
-        <input placeholder="Search token, wallet, contract, or address..." />
-        <kbd>⌘ K</kbd>
-      </label>
+
+      {/* Search */}
+      <div className="commandSearchWrap">
+        <label className="commandSearch">
+          <Search size={18} />
+          <input
+            ref={searchRef}
+            placeholder="Search token, wallet, contract, or address..."
+            value={searchQuery}
+            onChange={e => onSearchChange(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+          />
+          <kbd>⌘ K</kbd>
+        </label>
+        {searchFocused && searchResults.length > 0 && (
+          <div className="searchDropdown">
+            {searchResults.map(t => (
+              <button
+                key={t.address}
+                type="button"
+                className="searchResult"
+                onMouseDown={() => { onSearchSelect(t); onSearchChange(""); }}
+              >
+                <TokenLogo label={t.ticker} tone="cyan" />
+                <span>
+                  <strong>{t.ticker}</strong>
+                  <small>{t.name} · {t.chain.toUpperCase()}</small>
+                </span>
+                <span className={t.priceChange24h >= 0 ? "positive" : "negative"}>{signedPct(t.priceChange24h)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="topActions">
-        <button className="topButton" type="button"><Bell size={16} /> Alerts <span>{alertCount}</span></button>
-        <button className="topButton" type="button"><Star size={16} /> Watchlist</button>
-        <button className="walletButton" type="button"><TokenLogo label="0x" tone="blue" /> 0x8f3...a21c <ChevronDown size={15} /></button>
+        {/* Alerts */}
+        <div style={{ position: "relative" }}>
+          <button className="topButton" type="button" onClick={() => setAlertsOpen(o => !o)}>
+            <Bell size={16} /> Alerts {alertCount > 0 && <span>{alertCount}</span>}
+          </button>
+          {alertsOpen && (
+            <div className="navDropdown" onMouseLeave={() => setAlertsOpen(false)}>
+              <div className="navDropdownTitle">Alert Summary</div>
+              {alertCount === 0
+                ? <div className="navDropdownEmpty">No alerts — indexer running</div>
+                : <div className="navDropdownItem"><Bell size={13} /><span>{alertCount} active alerts</span></div>
+              }
+              <div className="navDropdownFooter">Full alerts panel coming soon</div>
+            </div>
+          )}
+        </div>
+
+        {/* Watchlist */}
+        <button className="topButton" type="button" onClick={onWatchlistClick}>
+          <Star size={16} /> Watchlist
+        </button>
+
+        {/* Wallet */}
+        <button className="walletButton" type="button" onClick={connectWallet}>
+          <TokenLogo label={walletAddress ? walletAddress.slice(2, 4).toUpperCase() : "0x"} tone="blue" />
+          {walletAddress
+            ? `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`
+            : "Connect Wallet"
+          }
+          <ChevronDown size={15} />
+        </button>
       </div>
     </header>
   );
@@ -331,20 +480,63 @@ function TrendingTicker({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: 
   );
 }
 
+const SPEED_OPTIONS: Array<{ value: 0.5 | 1 | 2 | 5; label: string }> = [
+  { value: 0.5, label: "0.5× Slow" },
+  { value: 1,   label: "1× Normal" },
+  { value: 2,   label: "2× Fast" },
+  { value: 5,   label: "5× Turbo" },
+];
+const RISK_FILTERS: Array<{ value: string; label: string }> = [
+  { value: "Low",     label: "Low Risk" },
+  { value: "Medium",  label: "Medium Risk" },
+  { value: "High",    label: "High Risk" },
+  { value: "Extreme", label: "Extreme Risk" },
+];
+
 function LaunchRadar({
-  tokens, selected, chain, live, onChainChange, onLiveChange, onSelect,
+  tokens, selected, chain, live, speed, filterRisks,
+  onChainChange, onLiveChange, onSpeedChange, onFilterChange, onSelect,
 }: {
   tokens: RadarToken[];
   selected?: RadarToken;
   chain: "all" | ChainKey;
   live: boolean;
+  speed: 0.5 | 1 | 2 | 5;
+  filterRisks: Set<string>;
   onChainChange: (chain: "all" | ChainKey) => void;
   onLiveChange: (live: boolean) => void;
+  onSpeedChange: (s: 0.5 | 1 | 2 | 5) => void;
+  onFilterChange: (risks: Set<string>) => void;
   onSelect: (token: RadarToken) => void;
 }) {
+  const radarRef = useRef<HTMLElement>(null);
+  const [speedOpen, setSpeedOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      radarRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
+  }, []);
+
+  const toggleRiskFilter = useCallback((risk: string) => {
+    const next = new Set(filterRisks);
+    next.has(risk) ? next.delete(risk) : next.add(risk);
+    onFilterChange(next);
+  }, [filterRisks, onFilterChange]);
+
   const calloutTokens = tokens.slice(0, 5);
   return (
-    <section className="radarPanel" aria-label="Launch Radar">
+    <section className="radarPanel" ref={radarRef} aria-label="Launch Radar">
       <div className="radarHeader">
         <div>
           <h1>Launch Radar</h1>
@@ -365,8 +557,41 @@ function LaunchRadar({
               </button>
             ))}
           </div>
-          <button className="iconButton" type="button" aria-label="Filter radar"><Filter size={16} /></button>
-          <button className="iconButton" type="button" aria-label="Fullscreen radar"><Expand size={16} /></button>
+
+          {/* Risk filter */}
+          <div style={{ position: "relative" }}>
+            <button
+              className={`iconButton ${filterRisks.size > 0 ? "active" : ""}`}
+              type="button"
+              aria-label="Filter by risk"
+              onClick={() => setFilterOpen(o => !o)}
+            >
+              <Filter size={16} />
+              {filterRisks.size > 0 && <span style={{ fontSize: 9, marginLeft: 2 }}>{filterRisks.size}</span>}
+            </button>
+            {filterOpen && (
+              <div className="radarDropdown" onMouseLeave={() => setFilterOpen(false)}>
+                <div className="radarDropdownTitle">Filter by Risk</div>
+                {RISK_FILTERS.map(({ value, label }) => (
+                  <button key={value} type="button" className={`radarDropdownItem ${filterRisks.has(value) ? "selected" : ""}`} onClick={() => toggleRiskFilter(value)}>
+                    <span className={`riskDot ${value.toLowerCase()}`} />
+                    {label}
+                    {filterRisks.has(value) && <Check size={12} style={{ marginLeft: "auto" }} />}
+                  </button>
+                ))}
+                {filterRisks.size > 0 && (
+                  <button type="button" className="radarDropdownClear" onClick={() => onFilterChange(new Set())}>
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fullscreen */}
+          <button className={`iconButton ${isFullscreen ? "active" : ""}`} type="button" aria-label="Toggle fullscreen" onClick={toggleFullscreen}>
+            <Expand size={16} />
+          </button>
         </div>
       </div>
 
@@ -406,7 +631,26 @@ function LaunchRadar({
           <button className="iconButton" type="button" onClick={() => onLiveChange(!live)} aria-label={live ? "Pause" : "Play"}>
             {live ? <Pause size={16} /> : <Play size={16} />}
           </button>
-          <button className="speedButton" type="button">1x <ChevronDown size={13} /></button>
+          <div style={{ position: "relative" }}>
+            <button className="speedButton" type="button" onClick={() => setSpeedOpen(o => !o)}>
+              {speed}x <ChevronDown size={13} />
+            </button>
+            {speedOpen && (
+              <div className="radarDropdown radarDropdownUp" onMouseLeave={() => setSpeedOpen(false)}>
+                {SPEED_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`radarDropdownItem ${speed === value ? "selected" : ""}`}
+                    onClick={() => { onSpeedChange(value); setSpeedOpen(false); }}
+                  >
+                    {label}
+                    {speed === value && <Check size={12} style={{ marginLeft: "auto" }} />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -438,7 +682,13 @@ function RadarTooltip({ token }: { token: RadarToken }) {
   );
 }
 
-function TokenDetailPanel({ token, onOpenPage }: { token?: RadarToken; onOpenPage: (token: RadarToken) => void }) {
+function TokenDetailPanel({ token, onOpenPage, onClose, starred, onToggleStar }: {
+  token?: RadarToken;
+  onOpenPage: (token: RadarToken) => void;
+  onClose: () => void;
+  starred: Record<string, boolean>;
+  onToggleStar: (id: string) => void;
+}) {
   const [timeframe, setTimeframe] = useState("1h");
   const [copied, setCopied] = useState(false);
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -480,8 +730,15 @@ function TokenDetailPanel({ token, onOpenPage }: { token?: RadarToken; onOpenPag
             <LaunchSourceBadge source={token.launchSource} />
           </div>
         </div>
-        <button className="panelIcon starred" type="button" aria-label="Add to watchlist"><Star size={18} fill="currentColor" /></button>
-        <button className="panelIcon" type="button" aria-label="Close token panel"><X size={18} /></button>
+        <button
+          className={`panelIcon ${starred[token.id] ? "starred" : ""}`}
+          type="button"
+          aria-label={starred[token.id] ? "Remove from watchlist" : "Add to watchlist"}
+          onClick={() => onToggleStar(token.id)}
+        >
+          <Star size={18} fill={starred[token.id] ? "currentColor" : "none"} />
+        </button>
+        <button className="panelIcon" type="button" aria-label="Close token panel" onClick={onClose}><X size={18} /></button>
       </div>
 
       {/* Contract address */}
