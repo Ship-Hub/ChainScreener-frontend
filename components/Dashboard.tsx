@@ -1,292 +1,1129 @@
 "use client";
 
-import { Activity, ArrowDown, ArrowUp, Bell, CandlestickChart, Filter, Flame, Search, ShieldAlert, Wallet } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { ChainKey, TokenSummary } from "../lib/types";
+import {
+  Activity,
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  BookOpen,
+  Bot,
+  Check,
+  ChevronDown,
+  CircleDollarSign,
+  Copy,
+  Crosshair,
+  Database,
+  Droplets,
+  Expand,
+  ExternalLink,
+  Eye,
+  Filter,
+  Gauge,
+  Gem,
+  Hexagon,
+  KeyRound,
+  Layers,
+  Lock,
+  Pause,
+  Play,
+  Radar,
+  Search,
+  Settings,
+  Shield,
+  Star,
+  TrendingUp,
+  Wallet,
+  X,
+  Zap,
+} from "lucide-react";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import type { Candle, ChainKey, LivePool, LiveSwap, RiskLevel, TokenSummary } from "../lib/types";
+import { fetchLiveData, fetchTokenCandles, fetchTokenSwaps } from "../lib/api";
+import { MobileBottomNav } from "./MobileBottomNav";
 
 type DashboardProps = {
   initialTokens: TokenSummary[];
   initialTrending: TokenSummary[];
+  initialLivePools: LivePool[];
+  initialLiveSwaps: LiveSwap[];
+  alertCount: number;
 };
 
+type RadarType = "healthy" | "watch" | "high-risk" | "smart-money" | "viral";
+
+type RadarToken = TokenSummary & {
+  id: string;
+  ticker: string;
+  age: string;
+  buyers: number;
+  sellers: number;
+  holderGrowth: number;
+  liquidityLocked: number;
+  radarX: number;
+  radarY: number;
+  radarSize: number;
+  radarType: RadarType;
+  signalStrength: number;
+};
+
+
+type RightPanel = "token" | "watchlist" | "coming-soon";
+
 const chainOptions: Array<"all" | ChainKey> = ["all", "base", "eth", "bsc"];
-const riskOptions = ["all", "Low", "Medium", "High", "Extreme"];
+const timeframes = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
-const demoChart = Array.from({ length: 32 }, (_, index) => ({
-  t: index,
-  price: Number((0.0034 + Math.sin(index / 4) * 0.0004 + index * 0.00005).toFixed(5)),
-  volume: Math.round(1200 + Math.random() * 6000),
-}));
+const navSections = [
+  {
+    title: "",
+    items: [
+      { label: "Radar", icon: Radar },
+      { label: "Launches", icon: Activity },
+      { label: "Watchlist", icon: Star },
+      { label: "Opportunities", icon: Gem },
+      { label: "Alerts", icon: Bell },
+    ],
+  },
+  {
+    title: "Intelligence",
+    items: [
+      { label: "Smart Money", icon: Zap },
+      { label: "Wallet Explorer", icon: Wallet },
+      { label: "Holder Analysis", icon: Crosshair },
+      { label: "Risk Scanner", icon: Shield },
+      { label: "Top Gainers", icon: TrendingUp },
+      { label: "Top Volume", icon: CircleDollarSign },
+    ],
+  },
+  {
+    title: "Tools",
+    items: [
+      { label: "DEX Pools", icon: Layers },
+      { label: "Liquidity Locks", icon: Lock },
+      { label: "Contract Analyzer", icon: Database },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { label: "Settings", icon: Settings },
+      { label: "API Access", icon: KeyRound },
+      { label: "Documentation", icon: BookOpen },
+    ],
+  },
+];
 
-export function Dashboard({ initialTokens, initialTrending }: DashboardProps) {
+// Leaderboard entry shape returned by /api/smart-money/leaderboard
+type LeaderEntry = {
+  rank: number;
+  wallet: string;
+  score: number;
+  totalTrades: number;
+  winRatePct: number;
+  realizedPnlUsd: number;
+  earlyEntryPct: number;
+  totalClosedTrades: number;
+  lastSeenAt: string | null;
+};
+
+const logoPalette = ["cyan", "amber", "violet", "green", "rose", "blue"];
+
+export function Dashboard({ initialTokens, initialTrending, initialLivePools, initialLiveSwaps, alertCount }: DashboardProps) {
+  const router = useRouter();
+  const [tokens, setTokens] = useState(initialTokens);
+  const [livePools, setLivePools] = useState(initialLivePools);
+  const [liveSwaps, setLiveSwaps] = useState(initialLiveSwaps);
   const [chain, setChain] = useState<"all" | ChainKey>("all");
-  const [risk, setRisk] = useState("all");
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<TokenSummary | undefined>(initialTokens[0]);
+  const [live, setLive] = useState(true);
+  const [rightPanel, setRightPanel] = useState<RightPanel>("token");
+  const [activeNav, setActiveNav] = useState("Radar");
+  const [comingSoonLabel, setComingSoonLabel] = useState("");
 
-  const tokens = useMemo(() => {
-    return initialTokens
-      .filter((token) => chain === "all" || token.chain === chain)
-      .filter((token) => risk === "all" || token.riskLevel === risk)
-      .filter((token) => {
-        const needle = query.trim().toLowerCase();
-        if (!needle) return true;
-        return token.symbol.toLowerCase().includes(needle) || token.name.toLowerCase().includes(needle) || token.address.toLowerCase().includes(needle);
+  useEffect(() => {
+    let active = true;
+    const poll = () =>
+      fetchLiveData().then(({ tokens: t, livePools: p, liveSwaps: s }) => {
+        if (!active) return;
+        if (t.length) setTokens(t);
+        if (p.length) setLivePools(p);
+        if (s.length) setLiveSwaps(s);
       });
-  }, [chain, initialTokens, query, risk]);
+    const id = setInterval(poll, 15_000);
+    return () => { active = false; clearInterval(id); };
+  }, []);
 
-  const hotCount = tokens.filter((token) => token.lifecycle === "hot").length;
-  const averageRisk = tokens.length ? Math.round(tokens.reduce((sum, token) => sum + token.riskScore, 0) / tokens.length) : 0;
-  const totalVolume = tokens.reduce((sum, token) => sum + token.volume24hUsd, 0);
+  const radarTokens = useMemo(() => enrichTokens(tokens), [tokens]);
+  const trendingTokens = useMemo(() => enrichTokens(tokens.length ? tokens : initialTrending), [tokens, initialTrending]);
+  const [selected, setSelected] = useState<RadarToken | undefined>(radarTokens[0]);
+
+  // Show token in right panel without navigating
+  const showTokenInPanel = useCallback((token: RadarToken) => {
+    setSelected(token);
+    setRightPanel("token");
+    setActiveNav("Radar");
+  }, []);
+
+  // Navigate to full token page
+  const openTokenPage = useCallback((token: RadarToken) => {
+    router.push(`/token/${token.chain}/${token.address}`);
+  }, [router]);
+
+  // Sidebar nav routing
+  const COMING_SOON = new Set(["DEX Pools", "Liquidity Locks", "Contract Analyzer", "Opportunities", "Alerts"]);
+
+  const handleNavClick = useCallback((label: string) => {
+    if (label === "Launches")                              { router.push("/launches");         return; }
+    if (label === "Smart Money")                           { router.push("/smart-money");      return; }
+    if (label === "Top Gainers" || label === "Top Volume") { router.push("/top-gainers");      return; }
+    if (label === "Risk Scanner")                          { router.push("/risk-scanner");     return; }
+    if (label === "Holder Analysis")                       { router.push("/holder-analysis");  return; }
+    if (label === "Wallet Explorer")                       { router.push("/wallet/explorer");  return; }
+    if (COMING_SOON.has(label)) {
+      setComingSoonLabel(label);
+      setRightPanel("coming-soon");
+      setActiveNav(label);
+      return;
+    }
+    if (label === "Watchlist") { setRightPanel("watchlist"); setActiveNav("Watchlist"); return; }
+    if (label === "Radar")     { setRightPanel("token"); }
+    setActiveNav(label);
+  }, [router]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleTokens = useMemo(
+    () => radarTokens.filter((t) => chain === "all" || t.chain === chain),
+    [chain, radarTokens],
+  );
+  const selectedToken = selected && visibleTokens.some((t) => t.address === selected.address)
+    ? selected
+    : visibleTokens[0];
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brandMark">CS</div>
-          <div>
-            <strong>Chain Screener</strong>
-            <span>Launch intelligence</span>
-          </div>
-        </div>
-        <nav className="topnav" aria-label="Primary">
-          <button className="navButton active" type="button"><Activity size={16} /> Feed</button>
-          <button className="navIcon" type="button" aria-label="Alerts"><Bell size={17} /></button>
-        </nav>
-      </header>
-
-      <TrendingTicker tokens={initialTrending.length ? initialTrending : initialTokens} onSelect={setSelected} />
-
-      <section className="summaryBand" aria-label="Market summary">
-        <Metric label="Hot launches" value={hotCount.toString()} icon={<Flame size={18} />} tone="green" />
-        <Metric label="24h volume" value={money(totalVolume)} icon={<CandlestickChart size={18} />} tone="cyan" />
-        <Metric label="Average risk" value={`${averageRisk}/100`} icon={<ShieldAlert size={18} />} tone="amber" />
-        <Metric label="Smart buys" value={tokens.reduce((sum, token) => sum + token.smartWalletBuys, 0).toString()} icon={<Wallet size={18} />} tone="violet" />
-      </section>
-
-      <section className="workbench">
-        <aside className="filters" aria-label="Filters">
-          <div className="filterTitle"><Filter size={16} /> Filters</div>
-          <label className="field">
-            <span>Search</span>
-            <div className="searchBox">
-              <Search size={16} />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ticker, name, address" />
-            </div>
-          </label>
-          <Segmented label="Chain" options={chainOptions} value={chain} onChange={(value) => setChain(value as "all" | ChainKey)} />
-          <Segmented label="Risk" options={riskOptions} value={risk} onChange={setRisk} />
-          <div className="filterReadout">
-            <span>{tokens.length} launches</span>
-            <span>{chain.toUpperCase()}</span>
-          </div>
-        </aside>
-
-        <section className="tableRegion" aria-label="Token launch feed">
-          <TokenTable tokens={tokens} selected={selected} onSelect={setSelected} />
-        </section>
-
-        <TokenDrawer token={selected} />
-      </section>
-    </main>
+    <AppShell>
+      <TopNavbar alertCount={alertCount} />
+      <TrendingTicker tokens={trendingTokens} onSelect={showTokenInPanel} />
+      <div className="dashboardGrid">
+        <Sidebar activeItem={activeNav} onNavigate={handleNavClick} />
+        <main className="radarWorkspace">
+          <LaunchRadar
+            tokens={visibleTokens}
+            selected={selectedToken}
+            chain={chain}
+            live={live}
+            onChainChange={setChain}
+            onLiveChange={setLive}
+            onSelect={(t) => { setSelected(t); openTokenPage(t); }}
+          />
+          <section className="lowerGrid" aria-label="Launch intelligence">
+            <LatestLaunchesCard tokens={visibleTokens} onSelect={showTokenInPanel} />
+            <SmartMoneyFlowCard swaps={liveSwaps} />
+            <RadarInsightsCard selected={selectedToken} tokens={visibleTokens} />
+            <LivePoolsCard pools={livePools} tokens={visibleTokens} />
+          </section>
+        </main>
+        {rightPanel === "watchlist"
+          ? <WatchlistPanel onClose={() => { setRightPanel("token"); setActiveNav("Radar"); }} />
+          : rightPanel === "coming-soon"
+          ? <ComingSoonPanel label={comingSoonLabel} onClose={() => { setRightPanel("token"); setActiveNav("Radar"); }} />
+          : <TokenDetailPanel token={selectedToken} onOpenPage={openTokenPage} />
+        }
+      </div>
+    </AppShell>
   );
 }
 
-function TrendingTicker({ tokens, onSelect }: { tokens: TokenSummary[]; onSelect: (token: TokenSummary) => void }) {
-  const tickerTokens = [...tokens, ...tokens];
+function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="ticker" aria-label="Trending tokens">
-      <div className="tickerTrack">
-        {tickerTokens.map((token, index) => (
-          <button className="tickerItem" key={`${token.address}-${index}`} type="button" onClick={() => onSelect(token)}>
-            <TokenAvatar token={token} />
-            <strong>{token.symbol}</strong>
-            <span className={token.priceChange24h >= 0 ? "up" : "down"}>{signedPct(token.priceChange24h)}</span>
-            <span>{money(token.marketCapUsd)}</span>
-            <span className="tickerTip">{token.launchSource} | {token.riskLevel} risk | Score {token.trendingScore}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function Metric({ label, value, icon, tone }: { label: string; value: string; icon: React.ReactNode; tone: string }) {
-  return (
-    <div className={`metric ${tone}`}>
-      <span>{icon}</span>
-      <div>
-        <small>{label}</small>
-        <strong>{value}</strong>
-      </div>
+    <div className="appShell">
+      {children}
+      <MobileBottomNav />
     </div>
   );
 }
 
-function Segmented({ label, options, value, onChange }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
+function TopNavbar({ alertCount }: { alertCount: number }) {
   return (
-    <div className="segGroup">
-      <span>{label}</span>
-      <div>
-        {options.map((option) => (
-          <button className={value === option ? "selected" : ""} key={option} type="button" onClick={() => onChange(option)}>
-            {option.toUpperCase()}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TokenTable({ tokens, selected, onSelect }: { tokens: TokenSummary[]; selected?: TokenSummary; onSelect: (token: TokenSummary) => void }) {
-  return (
-    <div className="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Token</th>
-            <th>Chain</th>
-            <th>Source</th>
-            <th>Age</th>
-            <th>Price</th>
-            <th>24h</th>
-            <th>MCap</th>
-            <th>Liq</th>
-            <th>Volume</th>
-            <th>Buys/Sells</th>
-            <th>Holders</th>
-            <th>Risk</th>
-            <th>Smart</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tokens.map((token) => (
-            <tr className={selected?.address === token.address ? "rowActive" : ""} key={token.address} onClick={() => onSelect(token)}>
-              <td>
-                <div className="tokenCell">
-                  <TokenAvatar token={token} />
-                  <div>
-                    <strong>{token.symbol}</strong>
-                    <span>{token.name}</span>
-                  </div>
-                </div>
-              </td>
-              <td><span className={`chain ${token.chain}`}>{token.chain.toUpperCase()}</span></td>
-              <td>{token.launchSource}</td>
-              <td>{formatAge(token.ageMinutes)}</td>
-              <td>${token.priceUsd.toFixed(token.priceUsd < 0.01 ? 5 : 3)}</td>
-              <td className={token.priceChange24h >= 0 ? "up" : "down"}>{signedPct(token.priceChange24h)}</td>
-              <td>{money(token.marketCapUsd)}</td>
-              <td>{money(token.liquidityUsd)}</td>
-              <td>{money(token.volume24hUsd)}</td>
-              <td>{token.buys}/{token.sells}</td>
-              <td>{compact(token.holders)}</td>
-              <td><span className={`risk ${token.riskLevel.toLowerCase()}`}>{token.riskLevel}</span></td>
-              <td>{token.smartWalletBuys}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function TokenDrawer({ token }: { token?: TokenSummary }) {
-  if (!token) {
-    return <aside className="drawer empty">Select a token</aside>;
-  }
-
-  const riskReasons = [
-    `${token.topHolderConcentration}% top holder concentration`,
-    token.devWalletActivity === "quiet" ? "Developer wallet quiet" : `Developer wallet: ${token.devWalletActivity}`,
-    `${token.uniqueBuyers} unique buyers vs ${token.uniqueSellers} sellers`,
-  ];
-
-  return (
-    <aside className="drawer">
-      <div className="drawerHead">
-        <TokenAvatar token={token} />
+    <header className="topNavbar">
+      <div className="brandLockup">
+        <span className="brandOrb"><Radar size={22} /></span>
         <div>
-          <strong>{token.symbol}</strong>
-          <span>{token.name}</span>
+          <strong>Chain Screener</strong>
+          <span>Launch radar</span>
         </div>
       </div>
-      <div className="priceLine">
-        <strong>${token.priceUsd.toFixed(5)}</strong>
-        <span className={token.priceChange1h >= 0 ? "up" : "down"}>
-          {token.priceChange1h >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-          {signedPct(token.priceChange1h)} 1h
-        </span>
+      <label className="commandSearch">
+        <Search size={18} />
+        <input placeholder="Search token, wallet, contract, or address..." />
+        <kbd>⌘ K</kbd>
+      </label>
+      <div className="topActions">
+        <button className="topButton" type="button"><Bell size={16} /> Alerts <span>{alertCount}</span></button>
+        <button className="topButton" type="button"><Star size={16} /> Watchlist</button>
+        <button className="walletButton" type="button"><TokenLogo label="0x" tone="blue" /> 0x8f3...a21c <ChevronDown size={15} /></button>
       </div>
-      <div className="chartBox">
-        <ResponsiveContainer width="100%" height={170}>
-          <AreaChart data={demoChart}>
-            <defs>
-              <linearGradient id="price" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="5%" stopColor="oklch(0.74 0.17 172)" stopOpacity={0.42} />
-                <stop offset="95%" stopColor="oklch(0.74 0.17 172)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <XAxis dataKey="t" hide />
-            <YAxis hide domain={["dataMin", "dataMax"]} />
-            <Tooltip contentStyle={{ background: "oklch(0.18 0.018 235)", border: "1px solid oklch(0.36 0.026 235)", color: "oklch(0.88 0.012 220)" }} />
-            <Area dataKey="price" stroke="oklch(0.74 0.17 172)" fill="url(#price)" strokeWidth={2} type="monotone" />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="detailGrid">
-        <Detail label="Market cap" value={money(token.marketCapUsd)} />
-        <Detail label="Liquidity" value={money(token.liquidityUsd)} />
-        <Detail label="Volume 1h" value={money(token.volume1hUsd)} />
-        <Detail label="Trending" value={`${token.trendingScore}/100`} />
-      </div>
-      <section className="riskPanel">
-        <div>
-          <span>Risk score</span>
-          <strong>{token.riskScore}/100</strong>
-        </div>
-        {riskReasons.map((reason) => <p key={reason}>{reason}</p>)}
-      </section>
-      <section className="miniFeed">
-        <strong>Live activity</strong>
-        <p>{token.smartWalletBuys} smart wallet buys detected across active pools.</p>
-        <p>{token.newHolders24h} new holders since launch window opened.</p>
+    </header>
+  );
+}
+
+function Sidebar({ activeItem, onNavigate }: { activeItem: string; onNavigate: (label: string) => void }) {
+  return (
+    <aside className="sidebar">
+      <nav aria-label="Dashboard">
+        {navSections.map((section) => (
+          <div className="navSection" key={section.title || "primary"}>
+            {section.title ? <span className="navSectionTitle">{section.title}</span> : null}
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  className={`sideNavItem ${activeItem === item.label ? "active" : ""}`}
+                  key={item.label}
+                  type="button"
+                  onClick={() => onNavigate(item.label)}
+                >
+                  <Icon size={16} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </nav>
+      <section className="proPanel">
+        <strong><Gem size={16} /> Go Pro</strong>
+        <p>Advanced analytics, real-time alerts, and unlimited scans.</p>
+        <button type="button">Upgrade Now <ArrowRight size={15} /></button>
       </section>
     </aside>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function TrendingTicker({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: (token: RadarToken) => void }) {
+  const tickerTokens = [...tokens, ...tokens, ...tokens];
   return (
-    <div className="detail">
+    <section className="trendingTicker" aria-label="Trending tokens">
+      <div className="tickerLead"><TrendingUp size={15} /> Trending <ChevronDown size={13} /></div>
+      <div className="tickerViewport">
+        <div className="tickerRail">
+          {tickerTokens.map((token, index) => (
+            <button className="tickerToken" key={`${token.address}-${index}`} type="button" onClick={() => onSelect(token)}>
+              <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
+              <strong>{token.ticker}</strong>
+              <span className={token.priceChange24h >= 0 ? "positive" : "negative"}>{signedPct(token.priceChange24h)}</span>
+              <small>{money(token.volume24hUsd)}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+      <button className="viewAllButton" type="button">View all <ArrowRight size={15} /></button>
+    </section>
+  );
+}
+
+function LaunchRadar({
+  tokens, selected, chain, live, onChainChange, onLiveChange, onSelect,
+}: {
+  tokens: RadarToken[];
+  selected?: RadarToken;
+  chain: "all" | ChainKey;
+  live: boolean;
+  onChainChange: (chain: "all" | ChainKey) => void;
+  onLiveChange: (live: boolean) => void;
+  onSelect: (token: RadarToken) => void;
+}) {
+  const calloutTokens = tokens.slice(0, 5);
+  return (
+    <section className="radarPanel" aria-label="Launch Radar">
+      <div className="radarHeader">
+        <div>
+          <h1>Launch Radar</h1>
+          <span className="livePill"><i /> {live ? "Live" : "Paused"}</span>
+        </div>
+        <div className="radarLegend" aria-label="Risk legend">
+          <LegendDot type="healthy" label="Healthy" />
+          <LegendDot type="watch" label="Watch" />
+          <LegendDot type="high-risk" label="High Risk" />
+          <LegendDot type="smart-money" label="Smart Money" />
+          <LegendDot type="viral" label="Viral" />
+        </div>
+        <div className="radarControls">
+          <div className="chainSwitch" role="group" aria-label="Chain filter">
+            {chainOptions.map((option) => (
+              <button className={chain === option ? "selected" : ""} key={option} type="button" onClick={() => onChainChange(option)}>
+                {option.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button className="iconButton" type="button" aria-label="Filter radar"><Filter size={16} /></button>
+          <button className="iconButton" type="button" aria-label="Fullscreen radar"><Expand size={16} /></button>
+        </div>
+      </div>
+
+      <div className="radarStage">
+        <div className="starfield" />
+        <div className="radarSweep" />
+        <div className="radarCore" />
+        <span className="axis north">N</span>
+        <span className="axis east">E</span>
+        <span className="axis south">S</span>
+        <span className="axis west">W</span>
+        {[25, 50, 75, 100].map((range) => <span className={`rangeLabel range${range}`} key={range}>{range}m</span>)}
+        {tokens.map((token) => (
+          <RadarDot key={token.address} token={token} selected={selected?.address === token.address} onSelect={onSelect} />
+        ))}
+        {calloutTokens.map((token, index) => (
+          <button
+            className={`radarCallout callout${index + 1}`}
+            key={`callout-${token.address}`}
+            type="button"
+            onClick={() => onSelect(token)}
+          >
+            <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
+            <span>
+              <strong>{token.ticker}</strong>
+              <small>{money(token.volume24hUsd)}</small>
+              <em>{signedPct(token.priceChange24h)}</em>
+            </span>
+          </button>
+        ))}
+        <div className="radarMetric">
+          <span>Live launches</span>
+          <strong>{tokens.length * 12}</strong>
+          <small>24h</small>
+        </div>
+        <div className="playControls">
+          <button className="iconButton" type="button" onClick={() => onLiveChange(!live)} aria-label={live ? "Pause" : "Play"}>
+            {live ? <Pause size={16} /> : <Play size={16} />}
+          </button>
+          <button className="speedButton" type="button">1x <ChevronDown size={13} /></button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RadarDot({ token, selected, onSelect }: { token: RadarToken; selected: boolean; onSelect: (token: RadarToken) => void }) {
+  return (
+    <button
+      className={`radarDot ${token.radarType} ${selected ? "selected" : ""}`}
+      style={{ left: `${token.radarX}%`, top: `${token.radarY}%`, width: token.radarSize, height: token.radarSize }}
+      type="button"
+      onClick={() => onSelect(token)}
+      aria-label={`${token.ticker} ${token.riskLevel} risk`}
+    >
+      <span />
+      <RadarTooltip token={token} />
+    </button>
+  );
+}
+
+function RadarTooltip({ token }: { token: RadarToken }) {
+  return (
+    <span className="radarTooltip">
+      <strong>{token.ticker}</strong>
+      <small>{money(token.volume24hUsd)} volume</small>
+      <em>{signedPct(token.priceChange24h)}</em>
+    </span>
+  );
+}
+
+function TokenDetailPanel({ token, onOpenPage }: { token?: RadarToken; onOpenPage: (token: RadarToken) => void }) {
+  const [timeframe, setTimeframe] = useState("1h");
+  const [copied, setCopied] = useState(false);
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [poolAddress, setPoolAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) { setCandles([]); return; }
+    fetchTokenCandles(token.chain, token.address, timeframe).then(setCandles);
+  }, [token?.chain, token?.address, timeframe]);
+
+  useEffect(() => {
+    if (!token) { setPoolAddress(null); return; }
+    fetchTokenSwaps(token.chain, token.address, 1).then((swaps) => {
+      setPoolAddress(swaps[0]?.poolAddress ?? null);
+    });
+  }, [token?.chain, token?.address]);
+
+  const copyAddress = useCallback(() => {
+    if (!token) return;
+    navigator.clipboard.writeText(token.address).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [token]);
+
+  if (!token) {
+    return <aside className="tokenPanel emptyPanel">Select a token</aside>;
+  }
+
+  return (
+    <aside className="tokenPanel">
+      <div className="tokenPanelHead">
+        <TokenLogo label={token.ticker} tone="cyan" large />
+        <div>
+          <strong>{token.ticker}</strong>
+          <span>{token.name}</span>
+          <div className="badgeRow">
+            <ChainBadge chain={token.chain} />
+            <LaunchSourceBadge source={token.launchSource} />
+          </div>
+        </div>
+        <button className="panelIcon starred" type="button" aria-label="Add to watchlist"><Star size={18} fill="currentColor" /></button>
+        <button className="panelIcon" type="button" aria-label="Close token panel"><X size={18} /></button>
+      </div>
+
+      {/* Contract address */}
+      <div className="contractRow">
+        <span>Contract</span>
+        <a className="contractAddress" href={addressUrl(token.chain, token.address)} target="_blank" rel="noopener noreferrer" title={token.address}>
+          {shortAddress(token.address)}
+        </a>
+        <button type="button" className="copyButton" onClick={copyAddress} aria-label="Copy contract address">
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+        </button>
+        <a className="copyButton" href={addressUrl(token.chain, token.address)} target="_blank" rel="noopener noreferrer" aria-label="View on explorer">
+          <ExternalLink size={13} />
+        </a>
+      </div>
+
+      {/* Pair address */}
+      {poolAddress && (
+        <div className="contractRow" style={{ marginTop: 6 }}>
+          <span>Pair</span>
+          <a className="contractAddress" href={addressUrl(token.chain, poolAddress)} target="_blank" rel="noopener noreferrer" title={poolAddress}>
+            {shortAddress(poolAddress)}
+          </a>
+          <a className="copyButton" href={addressUrl(token.chain, poolAddress)} target="_blank" rel="noopener noreferrer" aria-label="View pair on explorer">
+            <ExternalLink size={13} />
+          </a>
+        </div>
+      )}
+
+      <div className="priceBlock">
+        <strong>${token.priceUsd.toFixed(token.priceUsd < 0.01 ? 6 : 4)}</strong>
+        <span className={token.priceChange24h >= 0 ? "positive" : "negative"}>{signedPct(token.priceChange24h)}</span>
+        <em><i /> Live</em>
+      </div>
+
+      <div className="metricStrip">
+        <DetailStat label="Market Cap" value={money(token.marketCapUsd)} />
+        <DetailStat label="Volume (24H)" value={money(token.volume24hUsd)} />
+        <DetailStat label="Liquidity" value={money(token.liquidityUsd)} />
+        <DetailStat label="Holders" value={compact(token.holders)} />
+      </div>
+
+      <div className="timeframeRow">
+        {timeframes.map((item) => (
+          <button className={timeframe === item ? "selected" : ""} key={item} type="button" onClick={() => setTimeframe(item)}>{item}</button>
+        ))}
+      </div>
+
+      <MiniCandlestickChart token={token} candles={candles} />
+
+      <div className="signalGrid">
+        <GaugeCard label="Risk Score" value={token.riskScore} caption={`${token.riskLevel} Risk`} tone={riskTone(token.riskLevel)} />
+        <GaugeCard label="Buyer Pressure" value={buyerPressure(token)} caption="Current" tone="cyan" />
+        <SignalCard label="Smart Money Interest" value={token.smartWalletBuys > 12 ? "High" : "Building"} detail={`${token.smartWalletBuys} wallets`} tone="green" />
+        <SignalCard label="Holder Growth (24H)" value={`+${token.holderGrowth.toFixed(1)}%`} detail={`${compact(token.holders)} holders`} tone="green" />
+        <SignalCard label="Launch Source" value={token.launchSource} detail={`${token.chain.toUpperCase()} discovery`} tone="cyan" />
+        <SignalCard label="Liquidity Lock" value={`${token.liquidityLocked}%`} detail={token.liquidityLocked > 80 ? "Strong lock" : "Monitor"} tone="green" />
+      </div>
+
+      <button className="primaryAction" type="button" onClick={() => onOpenPage(token)}>
+        View Full Intelligence <ArrowRight size={16} />
+      </button>
+    </aside>
+  );
+}
+
+function ComingSoonPanel({ label, onClose }: { label: string; onClose: () => void }) {
+  const icons: Record<string, React.ReactNode> = {
+    "DEX Pools":          <Layers size={32} />,
+    "Liquidity Locks":    <Lock size={32} />,
+    "Contract Analyzer":  <Database size={32} />,
+    "Opportunities":      <Gem size={32} />,
+    "Alerts":             <Bell size={32} />,
+  };
+  return (
+    <aside className="tokenPanel" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, textAlign: "center" }}>
+      <div style={{ width: 64, height: 64, display: "grid", placeItems: "center", borderRadius: "50%", background: "oklch(0.18 0.05 285)", color: "var(--violet)", border: "1px solid oklch(0.62 0.22 285 / 0.35)" }}>
+        {icons[label] ?? <Zap size={32} />}
+      </div>
+      <div>
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5, maxWidth: 240 }}>
+          This feature is under active development and will be available soon.
+        </div>
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 14px", borderRadius: 999, border: "1px solid oklch(0.62 0.22 285 / 0.5)", color: "var(--violet)", background: "oklch(0.18 0.05 285)" }}>
+        Coming Soon
+      </span>
+      <button
+        type="button"
+        className="panelLink"
+        onClick={onClose}
+        style={{ marginTop: 8 }}
+      >
+        ← Back to Radar <ArrowRight size={15} />
+      </button>
+    </aside>
+  );
+}
+
+function WatchlistPanel({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
+
+  useEffect(() => {
+    const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    fetch(`${api}/api/smart-money/leaderboard?limit=10`)
+      .then(r => r.json())
+      .then(d => setLeaderboard(d.data ?? []))
+      .catch(() => {});
+  }, []);
+
+  const topWallets = leaderboard.slice(0, 5);
+  const recentWallets = leaderboard.slice(0, 3);
+
+  function fmtLastSeen(iso: string | null): string {
+    if (!iso) return "—";
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60_000);
+    if (m < 1) return "just now";
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  }
+
+  return (
+    <aside className="tokenPanel" style={{ overflow: "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)" }}>
+          Top Smart Wallets
+        </span>
+        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", display: "grid", placeItems: "center" }}>
+          <X size={16} />
+        </button>
+      </div>
+
+      <div style={{ maxHeight: 260, overflowY: "auto", display: "grid", gap: 7, marginBottom: 20, paddingRight: 2 }}>
+        {topWallets.length === 0 ? (
+          <div style={{ color: "var(--faint)", fontSize: 12, padding: "12px 0", textAlign: "center" }}>
+            No smart wallets yet — run indexer:smart-wallets
+          </div>
+        ) : topWallets.map((w, i) => (
+          <button
+            key={w.wallet}
+            type="button"
+            onClick={() => router.push(`/wallet/${w.wallet}`)}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--line-soft)", borderRadius: 8, background: "oklch(0.12 0.018 255)", cursor: "pointer", textAlign: "left", width: "100%" }}
+          >
+            <span style={{ color: "var(--faint)", fontSize: 11, width: 16, flexShrink: 0 }}>{i + 1}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontFamily: "monospace", color: "var(--cyan)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {w.wallet.slice(0, 6)}…{w.wallet.slice(-4)}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+                Score {w.score} · {w.totalClosedTrades > 0 ? `${w.winRatePct}% win rate` : "tracking"}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "var(--faint)", flexShrink: 0 }}>
+              <Eye size={11} />
+              {w.score}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted)", marginBottom: 10 }}>
+        Recently Active
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {recentWallets.length === 0 ? (
+          <div style={{ color: "var(--faint)", fontSize: 12, padding: "8px 0", textAlign: "center" }}>No data yet</div>
+        ) : recentWallets.map((w) => (
+          <button
+            key={w.wallet}
+            type="button"
+            onClick={() => router.push(`/wallet/${w.wallet}`)}
+            style={{ padding: "10px 12px", border: "1px solid var(--line-soft)", borderRadius: 8, background: "oklch(0.12 0.018 255)", cursor: "pointer", textAlign: "left", width: "100%" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+              <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--cyan)" }}>
+                {w.wallet.slice(0, 8)}…{w.wallet.slice(-4)}
+              </span>
+              <span style={{ fontSize: 10, color: "var(--faint)" }}>{fmtLastSeen(w.lastSeenAt)}</span>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 7 }}>
+              Rank #{w.rank} · Score {w.score}
+            </div>
+            <div style={{ display: "flex", gap: 20 }}>
+              <div>
+                <div style={{ fontSize: 9, color: "var(--faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Trades</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{w.totalTrades}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 9, color: "var(--faint)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Win Rate</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+                  {w.totalClosedTrades > 0 ? `${w.winRatePct}%` : "—"}
+                </div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <button className="panelLink" type="button" onClick={() => router.push("/smart-money")} style={{ marginTop: 16 }}>
+        View Smart Money Board <ArrowRight size={15} />
+      </button>
+    </aside>
+  );
+}
+
+function LatestLaunchesCard({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: (token: RadarToken) => void }) {
+  return (
+    <section className="dataPanel latestLaunches">
+      <PanelTitle icon={<Zap size={16} />} title="Latest Launches" />
+      <table>
+        <thead>
+          <tr>
+            <th>Token</th>
+            <th>Chain</th>
+            <th>Age</th>
+            <th>MCap</th>
+            <th>Vol</th>
+            <th>Risk</th>
+            <th>Smart Money</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tokens.slice(0, 6).map((token, index) => (
+            <tr key={token.address} onClick={() => onSelect(token)} style={{ cursor: "pointer" }}>
+              <td>
+                <span className="rank">{index + 1}</span>
+                <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
+                <span className="tokenLink">
+                  <strong>{token.ticker}</strong>
+                </span>
+              </td>
+              <td><ChainBadge chain={token.chain} /></td>
+              <td>{token.age}</td>
+              <td>{money(token.marketCapUsd)}</td>
+              <td>{money(token.volume24hUsd)}</td>
+              <td><RiskBadge level={token.riskLevel} /></td>
+              <td><MiniSparkline tone={riskTone(token.riskLevel)} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button className="panelLink" type="button">View All Launches <ArrowRight size={15} /></button>
+    </section>
+  );
+}
+
+function SmartMoneyFlowCard({ swaps }: { swaps: LiveSwap[] }) {
+  const router = useRouter();
+  const liveRows = swaps.slice(0, 5);
+
+  return (
+    <section className="dataPanel">
+      <PanelTitle icon={<Wallet size={16} />} title="Smart Money Flow" />
+      <div className="flowList">
+        {liveRows.length ? liveRows.map((swap) => {
+          const t0 = resolvedSymbol(swap.token0Symbol, swap.token0 ?? swap.poolAddress ?? "");
+          const t1 = resolvedSymbol(swap.token1Symbol, swap.token1 ?? "");
+          const pair = t1 ? `${t0}/${t1}` : t0;
+          const walletAddr = swap.sender ?? swap.txHash;
+          const isFullAddr = /^0x[a-fA-F0-9]{40}$/.test(walletAddr);
+          return (
+            <div className="flowRow liveSwapRow" key={`${swap.chain}-${swap.txHash}-${swap.blockNumber}`}>
+              <button
+                type="button"
+                className="walletHash"
+                title={walletAddr}
+                onClick={() => isFullAddr ? router.push(`/wallet/${walletAddr}`) : window.open(addressUrl(swap.chain, walletAddr), "_blank")}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", font: "inherit", color: "var(--cyan)" }}
+              >
+                {shortAddress(walletAddr)}
+              </button>
+              <b className="buy">{swap.protocolVersion.toUpperCase()}</b>
+              <strong>{pair}</strong>
+              <span>{swap.chain.toUpperCase()}</span>
+              <a className="explorerLink muted" href={txUrl(swap.chain, swap.txHash)} target="_blank" rel="noopener noreferrer" title={swap.txHash}>
+                #{swap.blockNumber}
+              </a>
+            </div>
+          );
+        }) : (
+          <div style={{ padding: "16px 0", textAlign: "center", color: "var(--faint)", fontSize: 12 }}>
+            No swap activity yet — run the indexer
+          </div>
+        )}
+      </div>
+      <button className="panelLink" type="button">View All Activity <ArrowRight size={15} /></button>
+    </section>
+  );
+}
+
+function RadarInsightsCard({ selected, tokens }: { selected?: RadarToken; tokens: RadarToken[] }) {
+  const highRisk = tokens.filter((t) => t.riskLevel === "High" || t.riskLevel === "Extreme").length;
+
+  // Top gainer by 1h change among visible tokens
+  const topGainer = tokens.length > 0
+    ? [...tokens].sort((a, b) => b.priceChange1h - a.priceChange1h)[0]
+    : null;
+  const momentumToken = selected ?? topGainer ?? null;
+  const momentumPct = momentumToken?.priceChange1h ?? 0;
+  const momentumPositive = momentumPct > 0;
+
+  // Overall buy pressure (buys vs sells across all visible tokens)
+  const totalBuys = tokens.reduce((s, t) => s + t.buys, 0);
+  const totalSells = tokens.reduce((s, t) => s + t.sells, 0);
+  const totalSwaps = totalBuys + totalSells;
+  const buyPressurePct = totalSwaps > 0 ? Math.round((totalBuys / totalSwaps) * 100) : 50;
+  const marketBullish = buyPressurePct >= 55;
+
+  // Total on-chain liquidity across tracked tokens
+  const totalLiquidity = tokens.reduce((s, t) => s + t.liquidityUsd, 0);
+  const liquidityFmt = totalLiquidity >= 1_000_000
+    ? `$${(totalLiquidity / 1_000_000).toFixed(1)}M`
+    : totalLiquidity >= 1_000
+      ? `$${(totalLiquidity / 1_000).toFixed(0)}K`
+      : "$0";
+
+  return (
+    <section className="dataPanel">
+      <PanelTitle icon={<Gauge size={16} />} title="Radar Insights" />
+      <div className="insightList">
+        <Insight
+          icon={<TrendingUp size={16} />}
+          tone={momentumPositive ? "green" : "red"}
+          title={
+            momentumToken
+              ? `${momentumToken.ticker} ${momentumPositive ? "up" : "down"} ${Math.abs(momentumPct).toFixed(1)}% (1h)`
+              : "No price data yet"
+          }
+          detail={
+            momentumToken
+              ? `Vol 24h: $${(momentumToken.volume24hUsd / 1000).toFixed(0)}K · ${momentumToken.buys}B / ${momentumToken.sells}S`
+              : "Run indexer to populate"
+          }
+        />
+        <Insight
+          icon={<AlertTriangle size={16} />}
+          tone={highRisk > 0 ? "red" : "green"}
+          title={
+            tokens.length === 0
+              ? "No tokens indexed yet"
+              : highRisk > 0
+                ? `${highRisk} high-risk token${highRisk > 1 ? "s" : ""} detected`
+                : "No high-risk tokens in current view"
+          }
+          detail={
+            tokens.length > 0
+              ? `${tokens.length} tokens scanned · ${tokens.filter(t => t.riskLevel === "Low").length} low-risk`
+              : "Waiting for indexer data"
+          }
+        />
+        <Insight
+          icon={<Droplets size={16} />}
+          tone={marketBullish ? "cyan" : "amber"}
+          title={
+            totalSwaps > 0
+              ? `${buyPressurePct}% buy pressure · ${marketBullish ? "Bullish" : "Bearish"} sentiment`
+              : "Awaiting swap data"
+          }
+          detail={
+            totalLiquidity > 0
+              ? `${liquidityFmt} total tracked liquidity · ${totalSwaps} swaps`
+              : totalSwaps > 0
+                ? `${totalBuys} buys · ${totalSells} sells across ${tokens.length} tokens`
+                : "Run indexer to see signals"
+          }
+        />
+      </div>
+      <button className="panelLink" type="button">View All Insights <ArrowRight size={15} /></button>
+    </section>
+  );
+}
+
+function LivePoolsCard({ pools, tokens }: { pools: LivePool[]; tokens: RadarToken[] }) {
+  const totalVolume = tokens.reduce((sum, t) => sum + t.volume24hUsd, 0);
+  const newest = pools.slice(0, 5);
+
+  return (
+    <section className="dataPanel livePools">
+      <PanelTitle icon={<Database size={16} />} title="Live Chain Pools" />
+      {newest.length ? (
+        <div className="livePoolList">
+          {newest.map((pool) => {
+            const t0 = resolvedSymbol(pool.token0Symbol, pool.token0);
+            const t1 = resolvedSymbol(pool.token1Symbol, pool.token1);
+            const poolHref = pool.poolAddress ? addressUrl(pool.chain, pool.poolAddress) : null;
+            const t0Href = pool.token0 && pool.token0 !== "0x0000000000000000000000000000000000000000" ? addressUrl(pool.chain, pool.token0) : null;
+            const t1Href = pool.token1 && pool.token1 !== "0x0000000000000000000000000000000000000000" ? addressUrl(pool.chain, pool.token1) : null;
+            return (
+              <div className="livePoolRow" key={`${pool.chain}-${pool.txHash}-${pool.poolAddress ?? pool.poolId}`}>
+                <div>
+                  <strong>
+                    {t0Href ? <a className="explorerLink" href={t0Href} target="_blank" rel="noopener noreferrer">{t0}</a> : t0}
+                    {" / "}
+                    {t1Href ? <a className="explorerLink" href={t1Href} target="_blank" rel="noopener noreferrer">{t1}</a> : t1}
+                  </strong>
+                  <span className="poolDex">
+                    {pool.dexName} · {pool.protocolVersion.toUpperCase()}
+                    {poolHref && (
+                      <a className="explorerLink poolExplorer" href={poolHref} target="_blank" rel="noopener noreferrer" title={pool.poolAddress ?? ""}>
+                        <ExternalLink size={11} />
+                      </a>
+                    )}
+                  </span>
+                </div>
+                <ChainBadge chain={pool.chain} />
+                <a className="explorerLink muted" href={txUrl(pool.chain, pool.txHash)} target="_blank" rel="noopener noreferrer" title={pool.txHash}>
+                  #{pool.blockNumber}
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="statMosaic">
+          <MosaicStat label="Live Pools" value="0" detail="waiting" />
+          <MosaicStat label="Active Tokens" value={`${tokens.length}`} detail="seed view" />
+          <MosaicStat label="Total Volume" value={money(totalVolume)} detail="demo tokens" />
+          <MosaicStat label="Data Source" value="MySQL" detail="indexer" />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MiniCandlestickChart({ token, candles: realCandles }: { token: RadarToken; candles: Candle[] }) {
+  const candles = useMemo(
+    () => realCandles.length
+      ? realCandles.map((c) => ({ open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume }))
+      : makeCandles(token),
+    [realCandles, token],
+  );
+  const max = Math.max(...candles.map((item) => item.high));
+  const min = Math.min(...candles.map((item) => item.low));
+  const spread = max - min || 1;
+
+  return (
+    <div className="candlePanel">
+      <svg viewBox="0 0 320 156" role="img" aria-label={`${token.ticker} candlestick chart`}>
+        <g className="chartGrid">
+          {[24, 62, 100, 138].map((y) => <line key={y} x1="0" x2="320" y1={y} y2={y} />)}
+        </g>
+        {candles.map((item, index) => {
+          const x = 10 + index * 12;
+          const highY = chartNumber(18 + ((max - item.high) / spread) * 88);
+          const lowY = chartNumber(18 + ((max - item.low) / spread) * 88);
+          const openY = chartNumber(18 + ((max - item.open) / spread) * 88);
+          const closeY = chartNumber(18 + ((max - item.close) / spread) * 88);
+          const up = item.close >= item.open;
+          const bodyY = chartNumber(Math.min(openY, closeY));
+          const bodyH = chartNumber(Math.max(3, Math.abs(closeY - openY)));
+          const volumeH = chartNumber(8 + item.volume * 22);
+          return (
+            <g key={index} className={up ? "candleUp" : "candleDown"}>
+              <line x1={x} x2={x} y1={highY} y2={lowY} />
+              <rect x={x - 3} y={bodyY} width="6" height={bodyH} rx="1" />
+              <rect className="volumeBar" x={x - 4} y={chartNumber(144 - volumeH)} width="8" height={volumeH} rx="1" />
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function MiniSparkline({ tone }: { tone: string }) {
+  return (
+    <svg className={`sparkline ${tone}`} viewBox="0 0 86 28" aria-hidden="true">
+      <polyline points="2,22 12,20 20,14 30,18 40,12 50,15 60,8 70,13 84,4" />
+    </svg>
+  );
+}
+
+function GaugeCard({ label, value, caption, tone }: { label: string; value: number; caption: string; tone: string }) {
+  return (
+    <div className="gaugeCard">
+      <span>{label}</span>
+      <div className={`donut ${tone}`} style={{ "--value": `${Math.min(100, Math.max(0, value))}%` } as React.CSSProperties} />
+      <strong>{value}<small>/100</small></strong>
+      <em>{caption}</em>
+    </div>
+  );
+}
+
+function SignalCard({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: string }) {
+  return (
+    <div className={`signalCard ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  );
+}
+
+function Insight({ icon, tone, title, detail }: { icon: React.ReactNode; tone: string; title: string; detail: string }) {
+  return (
+    <div className={`insight ${tone}`}>
+      <span>{icon}</span>
+      <div>
+        <strong>{title}</strong>
+        <small>{detail}</small>
+      </div>
+    </div>
+  );
+}
+
+function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return <h2 className="panelTitle">{icon}{title}</h2>;
+}
+
+function DetailStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
   );
 }
 
-function TokenAvatar({ token }: { token: TokenSummary }) {
-  return token.logoUrl ? <img className="avatar" src={token.logoUrl} alt="" /> : <span className="avatar">{token.symbol.slice(0, 1)}</span>;
+function MosaicStat({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <div className="mosaicStat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  );
 }
 
-function signedPct(value: number) {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+function LegendDot({ type, label }: { type: RadarType; label: string }) {
+  return <span className={`legendDot ${type}`}><i /> {label}</span>;
 }
+
+function RiskBadge({ level }: { level: RiskLevel }) {
+  return <span className={`riskBadge ${level.toLowerCase()}`}>{level}</span>;
+}
+
+function ChainBadge({ chain }: { chain: ChainKey }) {
+  return <span className={`chainBadge ${chain}`}>{chain}</span>;
+}
+
+function LaunchSourceBadge({ source }: { source: string }) {
+  return <span className="sourceBadge">{source}</span>;
+}
+
+function TokenLogo({ label, tone, large = false }: { label: string; tone: string; large?: boolean }) {
+  return (
+    <span className={`tokenLogo ${tone} ${large ? "large" : ""}`}>
+      <Hexagon size={large ? 24 : 15} />
+      <b>{label.slice(0, 2).toUpperCase()}</b>
+    </span>
+  );
+}
+
+/* ── helpers ── */
+
+function enrichTokens(tokens: TokenSummary[]): RadarToken[] {
+  // Keep dots well inside the circle boundary (max ~72% so they stay on the disc)
+  const seedPositions = [[64, 28], [36, 30], [66, 66], [72, 48], [28, 56], [43, 47], [56, 33], [60, 63]];
+  return tokens.map((token, index) => {
+    const type = radarType(token, index);
+    const [radarX, radarY] = seedPositions[index % seedPositions.length];
+    return {
+      ...token,
+      id: `${token.chain}-${token.address}`,
+      ticker: token.symbol,
+      age: formatAge(token.ageMinutes),
+      buyers: token.uniqueBuyers,
+      sellers: token.uniqueSellers,
+      holderGrowth: Math.max(4.2, Math.min(38, token.newHolders24h / Math.max(1, token.holders) * 100)),
+      liquidityLocked: token.riskLevel === "Low" ? 100 : token.riskLevel === "Medium" ? 82 : 48,
+      radarX,
+      radarY,
+      radarSize: Math.max(16, Math.min(42, 16 + token.volume24hUsd / 12000)),
+      radarType: type,
+      signalStrength: Math.round((token.trendingScore + token.smartWalletBuys * 2) / 1.2),
+    };
+  });
+}
+
+function radarType(token: TokenSummary, index: number): RadarType {
+  if (token.riskLevel === "High" || token.riskLevel === "Extreme") return "high-risk";
+  if (token.smartWalletBuys >= 12) return "smart-money";
+  if (token.trendingScore >= 80) return "viral";
+  if (index % 3 === 0) return "watch";
+  return "healthy";
+}
+
+function makeCandles(token: RadarToken) {
+  return Array.from({ length: 24 }, (_, index) => {
+    const wave = Math.sin((index + token.ticker.length) / 3) * 0.14;
+    const trend = token.priceChange24h >= 0 ? index * 0.018 : -index * 0.012;
+    const base = 1 + wave + trend;
+    const open = base + Math.cos(index) * 0.05;
+    const close = base + Math.sin(index * 1.7) * 0.06;
+    return { open, close, high: Math.max(open, close) + 0.08, low: Math.min(open, close) - 0.08, volume: Math.abs(Math.sin(index * 0.9)) + 0.2 };
+  });
+}
+
+function buyerPressure(token: RadarToken) {
+  const total = token.buyers + token.sellers;
+  return total ? Math.round((token.buyers / total) * 100) : 0;
+}
+
+function chartNumber(value: number) { return Number(value.toFixed(3)); }
+
+function riskTone(level: RiskLevel) {
+  if (level === "Low") return "green";
+  if (level === "Medium") return "amber";
+  return "red";
+}
+
+function signedPct(value: number) { return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`; }
 
 function money(value: number) {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) return `$${Math.round(value / 1_000)}K`;
   return `$${Math.round(value)}`;
 }
 
 function compact(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return value.toString();
 }
 
+function shortAddress(value: string) {
+  if (!value) return "";
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function resolvedSymbol(symbol: string | null | undefined, address: string) {
+  if (symbol && symbol !== "UNKNOWN") return symbol;
+  if (!address || address === "0x0000000000000000000000000000000000000000") return "ETH";
+  return shortAddress(address);
+}
+
+function explorerRoot(chain: ChainKey) {
+  if (chain === "base") return "https://basescan.org";
+  if (chain === "eth") return "https://etherscan.io";
+  return "https://bscscan.com";
+}
+
+function addressUrl(chain: ChainKey, address: string) { return `${explorerRoot(chain)}/address/${address}`; }
+function txUrl(chain: ChainKey, hash: string) { return `${explorerRoot(chain)}/tx/${hash}`; }
+
 function formatAge(minutes: number) {
   if (minutes < 60) return `${minutes}m`;
-  if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
   return `${Math.floor(minutes / 1440)}d`;
 }

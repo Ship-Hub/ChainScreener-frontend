@@ -1,0 +1,1021 @@
+/* ============================================================
+   Top Gainers & Top Volume — page-scoped styles
+   All classes prefixed with "tg" to avoid collisions
+   ============================================================ */
+
+/* ── Layout shell ─────────────────────────────────────────── */
+.tgShell {
+  display: grid;
+  grid-template-columns: 188px 1fr 300px;
+  gap: 0;
+  min-height: calc(100vh - 64px);
+}
+
+.tgSidebar {
+  min-height: calc(100vh - 64px);
+  padding: 14px 10px;
+  border-right: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+}
+
+.tgMain {
+  min-width: 0;
+  padding: 18px;
+  overflow-x: hidden;
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+.tgPageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.tgPageHeaderLeft h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--green), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.tgPageHeaderLeft p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tgPageHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Timeframe buttons ────────────────────────────────────── */
+.tgTimeframeGroup {
+  display: flex;
+  height: 36px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: oklch(0.12 0.018 255);
+}
+
+.tgTfBtn {
+  height: 28px;
+  min-width: 38px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+  transition: background 150ms, border-color 150ms, color 150ms;
+}
+
+.tgTfBtn:hover {
+  color: var(--text);
+  background: oklch(0.19 0.025 255);
+}
+
+.tgTfBtn.tgTfActive {
+  color: var(--text);
+  border-color: oklch(0.56 0.17 210 / 0.62);
+  background: oklch(0.21 0.055 235);
+}
+
+.tgCustomizeBtn {
+  height: 36px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: oklch(0.8 0.14 285);
+  background: linear-gradient(135deg, oklch(0.2 0.06 285), oklch(0.14 0.03 258));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: opacity 150ms;
+}
+
+.tgCustomizeBtn:hover { opacity: 0.82; }
+
+/* ── Chain filter tabs ────────────────────────────────────── */
+.tgChainTabBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.tgChainTabBar::-webkit-scrollbar { display: none; }
+
+.tgChainTab {
+  height: 34px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 150ms, background 150ms, color 150ms;
+}
+
+.tgChainTab:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  color: var(--text);
+}
+
+.tgChainTab.tgChainActive {
+  color: var(--text);
+  border-color: oklch(0.62 0.22 285 / 0.68);
+  background: linear-gradient(135deg, oklch(0.26 0.13 285), oklch(0.18 0.06 258));
+}
+
+.tgChainDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tgChainDot.blue   { background: oklch(0.62 0.22 260); box-shadow: 0 0 6px oklch(0.62 0.22 260 / 0.6); }
+.tgChainDot.purple { background: oklch(0.62 0.22 285); box-shadow: 0 0 6px oklch(0.62 0.22 285 / 0.6); }
+.tgChainDot.yellow { background: var(--bsc);           box-shadow: 0 0 6px oklch(0.8 0.15 83 / 0.6); }
+.tgChainDot.green  { background: var(--green);         box-shadow: 0 0 6px oklch(0.76 0.19 151 / 0.6); }
+.tgChainDot.red    { background: var(--red);           box-shadow: 0 0 6px oklch(0.69 0.21 25 / 0.6); }
+
+/* ── Two-column table layout ─────────────────────────────── */
+.tgTablesRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+  min-width: 0;
+}
+
+/* ── Table panel ─────────────────────────────────────────── */
+.tgTablePanel {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tgTableHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  gap: 8px;
+}
+
+.tgTableHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tgTableTitle {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+.tgInfoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--faint);
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.tgDropdownBtn {
+  height: 26px;
+  padding: 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: border-color 150ms, color 150ms;
+}
+
+.tgDropdownBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  color: var(--text);
+}
+
+/* ── Table ───────────────────────────────────────────────── */
+.tgTableWrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.34 0.028 255 / 0.4) transparent;
+}
+
+.tgTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.tgTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 32px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  background: oklch(0.13 0.018 255);
+}
+
+.tgTable th:first-child  { padding-left: 12px; width: 28px; }
+.tgTable th:nth-child(2) { width: 24px; }
+.tgTable th:last-child   { padding-right: 12px; }
+
+.tgTable td {
+  height: 50px;
+  padding: 0 8px;
+  border-bottom: 1px solid oklch(0.34 0.028 255 / 0.18);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.tgTable td:first-child  { padding-left: 12px; }
+.tgTable td:last-child   { padding-right: 12px; }
+
+.tgTable tbody tr {
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.tgTable tbody tr:hover {
+  background: oklch(0.21 0.026 255 / 0.58);
+}
+
+.tgTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ── Star button ─────────────────────────────────────────── */
+.tgStarBtn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--faint);
+  background: transparent;
+  cursor: pointer;
+  transition: color 150ms;
+  flex-shrink: 0;
+}
+
+.tgStarBtn:hover    { color: var(--amber); }
+.tgStarBtn.tgStarred { color: var(--amber); }
+
+/* ── Rank ────────────────────────────────────────────────── */
+.tgRank {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Token cell ──────────────────────────────────────────── */
+.tgTokenCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tgTokenLogo {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cyan);
+  background: oklch(0.17 0.04 210);
+  box-shadow: inset 0 0 0 1px currentColor, 0 0 14px currentColor;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.tgTokenLogo.amber  { color: var(--amber);  background: oklch(0.18 0.04 83); }
+.tgTokenLogo.violet { color: var(--violet); background: oklch(0.18 0.05 285); }
+.tgTokenLogo.green  { color: var(--green);  background: oklch(0.18 0.04 151); }
+.tgTokenLogo.rose   { color: var(--red);    background: oklch(0.18 0.04 25); }
+.tgTokenLogo.blue   { color: var(--base);   background: oklch(0.18 0.04 260); }
+.tgTokenLogo.cyan   { color: var(--cyan);   background: oklch(0.17 0.04 210); }
+
+.tgTokenInfo { min-width: 0; }
+
+.tgTokenName {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90px;
+}
+
+.tgTokenPair {
+  display: block;
+  margin-top: 1px;
+  color: var(--faint);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90px;
+}
+
+/* ── Chain badge ─────────────────────────────────────────── */
+.tgChainBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.tgChainBadge.base { color: oklch(0.8 0.12 260); background: oklch(0.24 0.09 260 / 0.62); }
+.tgChainBadge.eth  { color: oklch(0.82 0.12 275); background: oklch(0.24 0.08 275 / 0.62); }
+.tgChainBadge.bsc  { color: var(--bsc);           background: oklch(0.22 0.05 83 / 0.62); }
+.tgChainBadge.sol  { color: oklch(0.82 0.18 155); background: oklch(0.22 0.06 155 / 0.62); }
+
+/* ── Price & change cells ─────────────────────────────────── */
+.tgPrice {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgChangePos {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgChangeNeg {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgVolume {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgLiq {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgMcap {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Sparkline in table ──────────────────────────────────── */
+.tgSparkline {
+  width: 56px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.tgSparkline polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tgSparkline.green { color: var(--green); }
+.tgSparkline.red   { color: var(--red); }
+.tgSparkline.cyan  { color: var(--cyan); }
+.tgSparkline.violet { color: var(--violet); }
+
+/* ── Volume percent bar ──────────────────────────────────── */
+.tgVolBarCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tgVolBarTrack {
+  width: 60px;
+  height: 6px;
+  border-radius: 3px;
+  background: oklch(0.22 0.025 255);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tgVolBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--violet), oklch(0.5 0.2 285));
+}
+
+.tgVolBarLabel {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgTrades {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── View all button ─────────────────────────────────────── */
+.tgViewAllBtn {
+  width: 100%;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  color: oklch(0.8 0.14 285);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: background 150ms;
+}
+
+.tgViewAllBtn:hover {
+  background: oklch(0.16 0.022 255);
+}
+
+/* ── Quick Insights section ──────────────────────────────── */
+.tgInsightsSection {
+  margin-bottom: 14px;
+}
+
+.tgInsightsSectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text);
+}
+
+.tgInsightsSectionHead svg {
+  color: var(--amber);
+}
+
+.tgInsightsGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.tgInsightCard {
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  position: relative;
+  overflow: hidden;
+  transition: border-color 150ms;
+  cursor: pointer;
+}
+
+.tgInsightCard:hover {
+  border-color: oklch(0.56 0.17 210 / 0.42);
+}
+
+.tgInsightCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.tgInsightCard:hover::before {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 0%, oklch(0.72 0.17 210 / 0.05), transparent 60%);
+}
+
+.tgInsightLabel {
+  display: block;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+
+.tgInsightRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tgInsightTokenLogo {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 7px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.tgInsightTokenLogo.green  { color: var(--green);  background: oklch(0.18 0.04 151); box-shadow: inset 0 0 0 1px var(--green); }
+.tgInsightTokenLogo.violet { color: var(--violet); background: oklch(0.18 0.05 285); box-shadow: inset 0 0 0 1px var(--violet); }
+.tgInsightTokenLogo.cyan   { color: var(--cyan);   background: oklch(0.17 0.04 210); box-shadow: inset 0 0 0 1px var(--cyan); }
+.tgInsightTokenLogo.amber  { color: var(--amber);  background: oklch(0.18 0.04 83);  box-shadow: inset 0 0 0 1px var(--amber); }
+.tgInsightTokenLogo.blue   { color: oklch(0.72 0.22 260); background: oklch(0.18 0.08 260); box-shadow: inset 0 0 0 1px oklch(0.72 0.22 260); }
+
+.tgInsightValue {
+  display: block;
+  font-size: 20px;
+  font-weight: 750;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.tgInsightValue.green  { color: var(--green); }
+.tgInsightValue.violet { color: var(--violet); }
+.tgInsightValue.cyan   { color: var(--cyan); }
+.tgInsightValue.amber  { color: var(--amber); }
+.tgInsightValue.blue   { color: oklch(0.72 0.22 260); }
+
+.tgInsightSub {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.tgInsightMeta {
+  display: block;
+  color: var(--faint);
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.tgInsightSparkline {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 58px;
+  height: 22px;
+}
+
+.tgInsightSparkline polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tgInsightSparkline.green  { color: var(--green); }
+.tgInsightSparkline.violet { color: var(--violet); }
+.tgInsightSparkline.cyan   { color: var(--cyan); }
+.tgInsightSparkline.amber  { color: var(--amber); }
+.tgInsightSparkline.blue   { color: oklch(0.72 0.22 260); }
+
+/* ── Right panel ─────────────────────────────────────────── */
+.tgRightPanel {
+  border-left: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, oklch(0.15 0.02 255 / 0.98), oklch(0.11 0.016 255 / 0.98));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  min-height: calc(100vh - 64px);
+}
+
+/* ── Right panel section header ─────────────────────────── */
+.tgRpSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tgRpSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text);
+}
+
+.tgRpSectionTitle svg {
+  color: var(--amber);
+}
+
+.tgRpPill {
+  height: 22px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  transition: border-color 150ms;
+}
+
+.tgRpPill:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+}
+
+/* ── Market snapshot stats ───────────────────────────────── */
+.tgStatList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tgStatRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid oklch(0.34 0.028 255 / 0.2);
+}
+
+.tgStatRow:last-child {
+  border-bottom: 0;
+}
+
+.tgStatLabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tgStatRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tgStatValue {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgStatChange {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tgStatChange.pos { color: var(--green); }
+.tgStatChange.neg { color: var(--red); }
+.tgStatChange.neu { color: var(--faint); }
+
+/* ── Volume by chain donut ───────────────────────────────── */
+.tgDonutWrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.tgDonut {
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, oklch(0.12 0.018 255) 0 50%, transparent 51%),
+    conic-gradient(
+      oklch(0.55 0.28 260)  0%   52.1%,
+      oklch(0.62 0.23 285)  52.1% 74.9%,
+      oklch(0.8 0.15 83)    74.9% 87.5%,
+      oklch(0.76 0.19 151)  87.5% 93.7%,
+      oklch(0.42 0.025 255) 93.7% 100%
+    );
+}
+
+.tgDonutLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.tgDonutLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.tgDonutDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tgDonutDot.base   { background: oklch(0.55 0.28 260); }
+.tgDonutDot.eth    { background: oklch(0.62 0.23 285); }
+.tgDonutDot.bsc    { background: oklch(0.8 0.15 83); }
+.tgDonutDot.sol    { background: oklch(0.76 0.19 151); }
+.tgDonutDot.other  { background: oklch(0.42 0.025 255); }
+
+.tgDonutLegendLabel { color: var(--muted); flex: 1; }
+.tgDonutLegendPct   { color: var(--text);  font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Winners vs Losers ───────────────────────────────────── */
+.tgWLRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tgWLWinners {
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--green);
+}
+
+.tgWLLosers {
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--red);
+}
+
+.tgWLLabels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.tgWLLabelW { color: var(--muted); font-size: 11px; }
+.tgWLLabelL { color: var(--muted); font-size: 11px; }
+
+.tgWLBar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--red);
+}
+
+.tgWLBarFill {
+  height: 100%;
+  border-radius: 999px 0 0 999px;
+  background: var(--green);
+}
+
+/* ── Recently active ─────────────────────────────────────── */
+.tgRecentList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tgRecentRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.tgRecentRow:hover {
+  background: oklch(0.16 0.022 255);
+  border-color: oklch(0.56 0.17 210 / 0.32);
+}
+
+.tgRecentTokenLogo {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 7px;
+  font-weight: 800;
+  flex-shrink: 0;
+  color: var(--green);
+  background: oklch(0.18 0.04 151);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.tgRecentInfo { flex: 1; min-width: 0; }
+
+.tgRecentName {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tgRecentTime {
+  display: block;
+  color: var(--faint);
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+.tgRecentBadge {
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  color: var(--green);
+  background: oklch(0.2 0.055 151 / 0.55);
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1400px) {
+  .tgInsightsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .tgShell {
+    grid-template-columns: 188px 1fr;
+  }
+
+  .tgRightPanel {
+    grid-column: 2;
+    border-left: 0;
+    border-top: 1px solid var(--line-soft);
+    min-height: auto;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1050px) {
+  .tgTablesRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .tgShell {
+    grid-template-columns: 1fr;
+  }
+
+  .tgSidebar {
+    display: none;
+  }
+
+  .tgInsightsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .tgShell {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .tgTopbar {
+    height: auto;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tgInsightsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tgTablesRow {
+    grid-template-columns: 1fr;
+  }
+
+  .tgTable {
+    font-size: 11px;
+  }
+
+  .tgTable th {
+    font-size: 10px;
+    padding: 7px 8px;
+  }
+
+  .tgTable td {
+    padding: 7px 8px;
+  }
+
+  .tgTableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tgRightPanel {
+    display: none;
+  }
+
+  /* Touch targets */
+  .tgFilterBtn,
+  .tgChainBtn {
+    min-height: 44px;
+  }
+}

@@ -1,0 +1,1477 @@
+/* ===================================================================
+   Chain Screener — WalletPage styles
+   All class names prefixed with "wp" to avoid collisions
+   =================================================================== */
+
+/* ── Shell ── */
+.wpShell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: oklch(0.09 0.012 258);
+  color: oklch(0.94 0.008 245);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+}
+
+/* ── Sidebar ── */
+.wpSidebar {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid oklch(0.42 0.035 255 / 0.22);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+
+.wpSidebar::-webkit-scrollbar { width: 3px; }
+.wpSidebar::-webkit-scrollbar-thumb { background: oklch(0.34 0.028 255 / 0.62); border-radius: 2px; }
+
+.wpNavSection {
+  padding: 14px 14px 4px;
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wpNavGroup {
+  padding: 2px 6px;
+}
+
+.wpNavDivider {
+  height: 1px;
+  background: oklch(0.42 0.035 255 / 0.22);
+  margin: 8px 10px;
+}
+
+.wpNavItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: oklch(0.72 0.028 248);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  transition: color 150ms, background 150ms, border-color 150ms;
+}
+
+.wpNavItem:hover {
+  color: oklch(0.94 0.008 245);
+  background: oklch(0.21 0.026 255 / 0.58);
+}
+
+.wpNavItem.active {
+  color: oklch(0.94 0.008 245);
+  border-color: oklch(0.62 0.22 285 / 0.68);
+  background: linear-gradient(135deg, oklch(0.26 0.13 285), oklch(0.18 0.06 258));
+  box-shadow: inset 0 0 20px oklch(0.62 0.22 285 / 0.18);
+}
+
+.wpNavItem svg {
+  flex-shrink: 0;
+}
+
+.wpNavItemLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Go Pro panel ── */
+.wpGoProBox {
+  margin: 12px 8px 8px;
+  padding: 14px;
+  border: 1px solid oklch(0.62 0.22 285 / 0.35);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.18 0.04 285), oklch(0.13 0.02 255));
+}
+
+.wpGoProTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: oklch(0.78 0.16 285);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.wpGoProDesc {
+  margin: 0 0 12px;
+  color: oklch(0.72 0.028 248);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.wpGoProBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  height: 36px;
+  border: 1px solid oklch(0.67 0.2 285 / 0.55);
+  border-radius: 8px;
+  color: oklch(0.94 0.008 245);
+  background: linear-gradient(135deg, oklch(0.42 0.18 285), oklch(0.25 0.08 260));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: opacity 150ms;
+}
+
+.wpGoProBtn:hover { opacity: 0.88; }
+
+/* ── Main area ── */
+.wpMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Top navbar ── */
+.wpTopBar {
+  flex-shrink: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 16px;
+  border-bottom: 1px solid oklch(0.42 0.035 255 / 0.22);
+  background: oklch(0.1 0.012 258 / 0.96);
+}
+
+.wpBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.wpBrandOrb {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid oklch(0.62 0.22 285);
+  border-radius: 50%;
+  color: oklch(0.62 0.23 285);
+  background: radial-gradient(circle, oklch(0.22 0.08 285), transparent 62%), oklch(0.16 0.022 255);
+  box-shadow: 0 0 24px oklch(0.62 0.22 285 / 0.32);
+  flex-shrink: 0;
+}
+
+.wpBrandName {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: oklch(0.94 0.008 245);
+}
+
+.wpSearch {
+  flex: 1;
+  max-width: 540px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid oklch(0.34 0.028 255 / 0.62);
+  border-radius: 8px;
+  background: linear-gradient(180deg, oklch(0.16 0.024 255), oklch(0.13 0.018 255));
+}
+
+.wpSearch input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: oklch(0.94 0.008 245);
+  font-size: 13px;
+}
+
+.wpSearch input::placeholder { color: oklch(0.72 0.028 248); }
+
+.wpSearchKbd {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 5px;
+  color: oklch(0.72 0.028 248);
+  background: oklch(0.11 0.012 255);
+  font-size: 11px;
+}
+
+.wpTopActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.wpAlertBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid oklch(0.34 0.028 255 / 0.62);
+  border-radius: 7px;
+  color: oklch(0.94 0.008 245);
+  background: oklch(0.16 0.022 255);
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: border-color 180ms, background 180ms;
+}
+
+.wpAlertBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  background: oklch(0.19 0.025 255);
+}
+
+.wpAlertBadge {
+  min-width: 20px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: oklch(0.62 0.23 285);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 0 4px;
+}
+
+.wpWatchlistBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid oklch(0.34 0.028 255 / 0.62);
+  border-radius: 7px;
+  color: oklch(0.94 0.008 245);
+  background: oklch(0.16 0.022 255);
+  cursor: pointer;
+  font-size: 12px;
+  transition: border-color 180ms, background 180ms;
+}
+
+.wpWatchlistBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  background: oklch(0.19 0.025 255);
+}
+
+.wpWalletChip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid oklch(0.56 0.17 210 / 0.42);
+  border-radius: 7px;
+  color: oklch(0.78 0.17 210);
+  background: oklch(0.16 0.04 210 / 0.5);
+  font-size: 12px;
+  font-family: monospace;
+}
+
+/* ── Content row (main + right panel) ── */
+.wpContentRow {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.wpLeftMain {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wpLeftMain::-webkit-scrollbar { width: 4px; }
+.wpLeftMain::-webkit-scrollbar-thumb { background: oklch(0.34 0.028 255 / 0.62); border-radius: 2px; }
+
+/* ── Wallet header ── */
+.wpWalletHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wpBackLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: oklch(0.72 0.028 248);
+  text-decoration: none;
+  font-size: 12px;
+  transition: color 150ms;
+  width: fit-content;
+}
+
+.wpBackLink:hover { color: oklch(0.94 0.008 245); }
+
+.wpHeaderCardRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.wpWalletIdent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wpWalletIdentTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wpAvatar {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.45 0.22 285), oklch(0.35 0.18 210));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: 2px solid oklch(0.62 0.22 285 / 0.55);
+  box-shadow: 0 0 28px oklch(0.62 0.22 285 / 0.28);
+}
+
+.wpWalletNameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wpAddressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wpAddress {
+  font-family: monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: oklch(0.94 0.008 245);
+}
+
+.wpCopyBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 6px;
+  color: oklch(0.72 0.028 248);
+  background: oklch(0.16 0.022 255);
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms;
+}
+
+.wpCopyBtn:hover {
+  color: oklch(0.78 0.17 210);
+  border-color: oklch(0.58 0.12 210 / 0.6);
+}
+
+.wpBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.wpBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wpBadge.cyan {
+  color: oklch(0.78 0.17 210);
+  background: oklch(0.2 0.06 210 / 0.55);
+  border: 1px solid oklch(0.78 0.17 210 / 0.35);
+}
+
+.wpBadge.amber {
+  color: oklch(0.83 0.18 83);
+  background: oklch(0.22 0.05 83 / 0.55);
+  border: 1px solid oklch(0.83 0.18 83 / 0.35);
+}
+
+.wpBadge.violet {
+  color: oklch(0.62 0.23 285);
+  background: oklch(0.2 0.06 285 / 0.55);
+  border: 1px solid oklch(0.62 0.23 285 / 0.35);
+}
+
+.wpBadge.green {
+  color: oklch(0.76 0.19 151);
+  background: oklch(0.2 0.055 151 / 0.55);
+  border: 1px solid oklch(0.76 0.19 151 / 0.35);
+}
+
+.wpBadge.blue {
+  color: oklch(0.65 0.16 240);
+  background: oklch(0.2 0.06 240 / 0.55);
+  border: 1px solid oklch(0.65 0.16 240 / 0.35);
+}
+
+.wpWalletMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.wpMetaItem {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wpMetaLabel {
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wpMetaValue {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: oklch(0.94 0.008 245);
+}
+
+.wpLiveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(0.76 0.19 151);
+  box-shadow: 0 0 10px oklch(0.76 0.19 151);
+  animation: wpBlink 1.5s ease-out infinite;
+  flex-shrink: 0;
+}
+
+.wpChainIcons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.wpChainDot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  font-weight: 800;
+  border: 1px solid oklch(0.42 0.035 255 / 0.45);
+}
+
+.wpChainDot.base { background: oklch(0.24 0.09 260 / 0.8); color: oklch(0.8 0.12 260); }
+.wpChainDot.eth { background: oklch(0.24 0.08 275 / 0.8); color: oklch(0.82 0.12 275); }
+.wpChainDot.bsc { background: oklch(0.22 0.05 83 / 0.8); color: oklch(0.8 0.15 83); }
+
+.wpMoreChains {
+  font-size: 11px;
+  color: oklch(0.72 0.028 248);
+}
+
+.wpPnlValue {
+  color: oklch(0.76 0.19 151);
+  font-weight: 700;
+}
+
+.wpHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wpFollowBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid oklch(0.62 0.22 285 / 0.55);
+  border-radius: 7px;
+  color: oklch(0.94 0.008 245);
+  background: linear-gradient(135deg, oklch(0.3 0.1 285 / 0.7), oklch(0.2 0.06 260 / 0.7));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: opacity 150ms;
+}
+
+.wpFollowBtn:hover { opacity: 0.82; }
+
+.wpMenuBtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid oklch(0.34 0.028 255 / 0.62);
+  border-radius: 7px;
+  color: oklch(0.72 0.028 248);
+  background: oklch(0.16 0.022 255);
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+}
+
+.wpMenuBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.5);
+  background: oklch(0.19 0.025 255);
+}
+
+/* ── Score card ── */
+.wpScoreCard {
+  padding: 16px 18px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.wpScoreTitle {
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.wpScoreMain {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.wpGaugeWrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+}
+
+.wpGaugeWrap svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wpGaugeCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.wpGaugeScore {
+  font-size: 22px;
+  font-weight: 800;
+  color: oklch(0.94 0.008 245);
+  line-height: 1;
+}
+
+.wpGaugeDenom {
+  font-size: 11px;
+  color: oklch(0.52 0.032 248);
+}
+
+.wpScoreBars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wpScoreBarRow {
+  display: grid;
+  grid-template-columns: 90px 1fr 28px;
+  gap: 7px;
+  align-items: center;
+}
+
+.wpScoreBarLabel {
+  font-size: 11px;
+  color: oklch(0.72 0.028 248);
+  white-space: nowrap;
+}
+
+.wpScoreBarTrack {
+  height: 5px;
+  border-radius: 3px;
+  background: oklch(0.23 0.03 255);
+  overflow: hidden;
+}
+
+.wpScoreBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: oklch(0.76 0.19 151);
+  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wpScoreBarVal {
+  font-size: 11px;
+  font-weight: 700;
+  color: oklch(0.94 0.008 245);
+  text-align: right;
+}
+
+.wpScoreLabel {
+  font-size: 11px;
+  color: oklch(0.78 0.17 210);
+  font-weight: 600;
+}
+
+/* ── Tier card ── */
+.wpTierCard {
+  padding: 16px 18px;
+  border: 1px solid oklch(0.62 0.22 285 / 0.32);
+  border-radius: 10px;
+  background: linear-gradient(135deg, oklch(0.18 0.04 285 / 0.8), oklch(0.13 0.02 255));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 160px;
+  text-align: center;
+}
+
+.wpTierCrown {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.4 0.2 83 / 0.55), oklch(0.3 0.15 285 / 0.55));
+  border: 1px solid oklch(0.83 0.18 83 / 0.45);
+  color: oklch(0.83 0.18 83);
+}
+
+.wpTierName {
+  font-size: 22px;
+  font-weight: 800;
+  color: oklch(0.94 0.008 245);
+  line-height: 1;
+}
+
+.wpTierSub {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wpTierRank {
+  font-size: 12px;
+  color: oklch(0.72 0.028 248);
+}
+
+.wpTierPct {
+  font-size: 11px;
+  font-weight: 700;
+  color: oklch(0.78 0.17 210);
+}
+
+/* ── Stats bar ── */
+.wpStatsBar {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.wpStat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  border-right: 1px solid oklch(0.42 0.035 255 / 0.22);
+  min-width: 0;
+}
+
+.wpStat:last-child { border-right: 0; }
+
+.wpStatLabel {
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wpStatValue {
+  font-size: 15px;
+  font-weight: 700;
+  color: oklch(0.94 0.008 245);
+  white-space: nowrap;
+}
+
+.wpStatSub {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.wpPositive { color: oklch(0.76 0.19 151); }
+.wpNegative { color: oklch(0.69 0.21 25); }
+.wpMuted { color: oklch(0.72 0.028 248); }
+
+/* ── Chart section ── */
+.wpChartSection {
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.wpChartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid oklch(0.42 0.035 255 / 0.22);
+  flex-wrap: wrap;
+}
+
+.wpChartTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wpChartTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wpChartPnl {
+  font-size: 20px;
+  font-weight: 800;
+  color: oklch(0.76 0.19 151);
+}
+
+.wpTimeframeRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wpTfBtn {
+  height: 28px;
+  min-width: 40px;
+  padding: 0 10px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 6px;
+  color: oklch(0.72 0.028 248);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: color 150ms, background 150ms, border-color 150ms;
+}
+
+.wpTfBtn:hover {
+  color: oklch(0.94 0.008 245);
+  background: oklch(0.19 0.025 255);
+}
+
+.wpTfBtn.active {
+  color: oklch(0.94 0.008 245);
+  border-color: oklch(0.56 0.17 210 / 0.62);
+  background: oklch(0.21 0.055 235);
+}
+
+.wpChartBody {
+  padding: 12px 8px 8px;
+}
+
+/* Recharts overrides */
+.wpChartBody .recharts-cartesian-grid-horizontal line,
+.wpChartBody .recharts-cartesian-grid-vertical line {
+  stroke: oklch(0.42 0.035 255 / 0.2);
+}
+
+.wpChartBody .recharts-text {
+  fill: oklch(0.52 0.032 248);
+  font-size: 11px;
+}
+
+.wpChartBody .recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.wpChartTooltip {
+  padding: 8px 12px;
+  border: 1px solid oklch(0.34 0.028 255 / 0.62);
+  border-radius: 8px;
+  background: oklch(0.13 0.02 255 / 0.98);
+  box-shadow: 0 14px 40px oklch(0.04 0.008 255 / 0.6);
+}
+
+.wpChartTooltip .label {
+  font-size: 11px;
+  color: oklch(0.52 0.032 248);
+  margin-bottom: 3px;
+}
+
+.wpChartTooltip .value {
+  font-size: 14px;
+  font-weight: 700;
+  color: oklch(0.76 0.19 151);
+}
+
+/* ── Bottom panels ── */
+.wpBottomRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr);
+  gap: 14px;
+}
+
+/* ── Holdings table ── */
+.wpHoldingsCard {
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.wpCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid oklch(0.42 0.035 255 / 0.22);
+}
+
+.wpCardTitle {
+  font-size: 11px;
+  font-weight: 800;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wpViewAllBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 6px;
+  color: oklch(0.78 0.17 210);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 11px;
+  transition: border-color 150ms, background 150ms;
+}
+
+.wpViewAllBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.5);
+  background: oklch(0.19 0.025 255);
+}
+
+.wpTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.wpTable th {
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid oklch(0.42 0.035 255 / 0.22);
+  white-space: nowrap;
+}
+
+.wpTable td {
+  padding: 9px 14px;
+  border-bottom: 1px solid oklch(0.34 0.028 255 / 0.35);
+  color: oklch(0.72 0.028 248);
+  white-space: nowrap;
+}
+
+.wpTable td:first-child { color: oklch(0.94 0.008 245); }
+
+.wpTable tbody tr {
+  transition: background 100ms;
+  cursor: pointer;
+}
+
+.wpTable tbody tr:hover {
+  background: oklch(0.21 0.026 255 / 0.5);
+}
+
+.wpTable tbody tr:last-child td { border-bottom: 0; }
+
+.wpTokenCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wpTokenName {
+  font-weight: 700;
+  color: oklch(0.94 0.008 245);
+}
+
+.wpTokenSub {
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+}
+
+.wpTableFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid oklch(0.42 0.035 255 / 0.22);
+  background: oklch(0.11 0.014 255 / 0.7);
+}
+
+.wpFooterLabel {
+  font-size: 11px;
+  color: oklch(0.52 0.032 248);
+}
+
+.wpFooterValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: oklch(0.94 0.008 245);
+}
+
+/* ── Activity + P&L cards ── */
+.wpRightCards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wpInfoCard {
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.wpInfoCardBody {
+  padding: 10px 14px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+}
+
+.wpInfoRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wpInfoLabel {
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wpInfoValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: oklch(0.94 0.008 245);
+}
+
+.wpInfoFullRow {
+  grid-column: 1 / -1;
+}
+
+/* ── Recent Trades table ── */
+.wpTradesCard {
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.wpTradesScroll {
+  overflow-x: auto;
+}
+
+.wpTradesScroll::-webkit-scrollbar { height: 4px; }
+.wpTradesScroll::-webkit-scrollbar-thumb { background: oklch(0.34 0.028 255 / 0.62); border-radius: 2px; }
+
+.wpTxType {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.wpTxType.buy {
+  color: oklch(0.76 0.19 151);
+  background: oklch(0.2 0.055 151 / 0.55);
+}
+
+.wpTxType.sell {
+  color: oklch(0.69 0.21 25);
+  background: oklch(0.2 0.055 25 / 0.55);
+}
+
+.wpBuyRow { background: oklch(0.76 0.19 151 / 0.025); }
+.wpSellRow { background: oklch(0.69 0.21 25 / 0.02); }
+
+.wpViewAllLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-top: 1px solid oklch(0.42 0.035 255 / 0.22);
+  color: oklch(0.78 0.17 210);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 150ms;
+  cursor: pointer;
+  background: none;
+  border-radius: 0;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.wpViewAllLink:hover { color: oklch(0.9 0.18 210); }
+
+/* ── Right panel ── */
+.wpRightPanel {
+  width: 320px;
+  flex-shrink: 0;
+  border-left: 1px solid oklch(0.42 0.035 255 / 0.22);
+  background: linear-gradient(180deg, oklch(0.14 0.02 255 / 0.98), oklch(0.11 0.014 255));
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 12px;
+  gap: 14px;
+}
+
+.wpRightPanel::-webkit-scrollbar { width: 3px; }
+.wpRightPanel::-webkit-scrollbar-thumb { background: oklch(0.34 0.028 255 / 0.62); border-radius: 2px; }
+
+.wpRightSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpRightSectionTitle {
+  font-size: 10px;
+  font-weight: 800;
+  color: oklch(0.52 0.032 248);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+/* ── Behavior tags ── */
+.wpTagCloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.wpTag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+.wpTag.cyan { color: oklch(0.78 0.17 210); background: oklch(0.2 0.06 210 / 0.4); border-color: oklch(0.78 0.17 210 / 0.35); }
+.wpTag.green { color: oklch(0.76 0.19 151); background: oklch(0.2 0.055 151 / 0.4); border-color: oklch(0.76 0.19 151 / 0.35); }
+.wpTag.blue { color: oklch(0.65 0.16 240); background: oklch(0.2 0.06 240 / 0.4); border-color: oklch(0.65 0.16 240 / 0.35); }
+.wpTag.amber { color: oklch(0.83 0.18 83); background: oklch(0.22 0.05 83 / 0.4); border-color: oklch(0.83 0.18 83 / 0.35); }
+
+/* ── Funding ── */
+.wpFundingCard {
+  padding: 10px 12px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 8px;
+  background: oklch(0.12 0.018 255);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wpFundingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.wpFundingLabel {
+  color: oklch(0.52 0.032 248);
+}
+
+.wpFundingVal {
+  font-weight: 600;
+  color: oklch(0.94 0.008 245);
+}
+
+.wpFundingAddr {
+  font-family: monospace;
+  color: oklch(0.78 0.17 210);
+  font-size: 11px;
+}
+
+/* ── Connected wallets graph ── */
+.wpGraphCard {
+  padding: 12px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 8px;
+  background: oklch(0.12 0.018 255);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wpGraphViz {
+  position: relative;
+  height: 160px;
+}
+
+.wpGraphCenter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, oklch(0.45 0.22 285), oklch(0.35 0.18 210));
+  border: 2px solid oklch(0.62 0.22 285 / 0.7);
+  box-shadow: 0 0 28px oklch(0.62 0.22 285 / 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  z-index: 2;
+}
+
+.wpGraphNode {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  z-index: 2;
+}
+
+.wpGraphNodeDot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: oklch(0.19 0.025 255);
+  border: 1px solid oklch(0.56 0.17 210 / 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.wpGraphNodeLabel {
+  font-size: 9px;
+  font-family: monospace;
+  color: oklch(0.52 0.032 248);
+  white-space: nowrap;
+}
+
+.wpGraphLine {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 1px;
+  background: oklch(0.56 0.17 210 / 0.28);
+  transform-origin: left center;
+  z-index: 1;
+}
+
+.wpGraphLink {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 11px;
+  color: oklch(0.78 0.17 210);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 150ms;
+}
+
+.wpGraphLink:hover { color: oklch(0.9 0.18 210); }
+
+/* ── Copy simulation ── */
+.wpCopySection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpCopyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 7px;
+  background: oklch(0.12 0.018 255);
+}
+
+.wpCopyPeriod {
+  font-size: 11px;
+  color: oklch(0.72 0.028 248);
+}
+
+.wpCopyRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wpCopyReturn {
+  font-size: 14px;
+  font-weight: 800;
+  color: oklch(0.76 0.19 151);
+}
+
+/* ── Similar wallets ── */
+.wpSimilarList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.wpSimilarRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid oklch(0.42 0.035 255 / 0.22);
+  border-radius: 7px;
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+
+.wpSimilarRow:hover {
+  background: oklch(0.19 0.025 255);
+  border-color: oklch(0.56 0.17 210 / 0.35);
+}
+
+.wpSimilarAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.wpSimilarMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.wpSimilarAddr {
+  font-size: 11px;
+  font-family: monospace;
+  color: oklch(0.94 0.008 245);
+  display: block;
+}
+
+.wpSimilarPct {
+  font-size: 10px;
+  color: oklch(0.52 0.032 248);
+}
+
+.wpSimilarReturn {
+  font-size: 12px;
+  font-weight: 700;
+  color: oklch(0.76 0.19 151);
+}
+
+/* ── Mini sparkline ── */
+.wpMiniSparkline {
+  width: 52px;
+  height: 22px;
+}
+
+.wpMiniSparkline polyline {
+  fill: none;
+  stroke: oklch(0.76 0.19 151);
+  stroke-width: 1.5;
+}
+
+/* ── Animations ── */
+@keyframes wpBlink {
+  0%, 100% { opacity: 1; }
+  45% { opacity: 0.28; }
+}
+
+/* ── Scrollbar global ── */
+.wpLeftMain::-webkit-scrollbar { width: 4px; }
+.wpLeftMain::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Responsive ── */
+@media (max-width: 1400px) {
+  .wpSidebar { width: 56px; }
+  .wpNavItemLabel, .wpNavSection, .wpGoProBox { display: none; }
+  .wpNavItem { justify-content: center; padding: 7px 0; }
+}
+
+@media (max-width: 1100px) {
+  .wpRightPanel { width: 280px; }
+  .wpHeaderCardRow { grid-template-columns: 1fr; }
+  .wpScoreCard, .wpTierCard { width: 100%; flex-direction: row; }
+}
+
+@media (max-width: 900px) {
+  .wpRightPanel { display: none; }
+  .wpBottomRow { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+  .wpShell {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .wpSidebar {
+    display: none;
+  }
+
+  .wpMain {
+    width: 100%;
+  }
+
+  .wpTopBar {
+    height: auto;
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .wpSearch {
+    display: none;
+  }
+
+  .wpHeaderCardRow {
+    grid-template-columns: 1fr;
+  }
+
+  .wpWalletIdent {
+    width: 100%;
+  }
+
+  .wpScoreCard,
+  .wpTierCard {
+    display: none;
+  }
+
+  .wpStatsBar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+  }
+
+  .wpChartSection {
+    padding: 12px;
+  }
+
+  .wpTable {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .wpTradesScroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Touch targets */
+  .wpFollowBtn,
+  .wpTfBtn {
+    min-height: 44px;
+  }
+}

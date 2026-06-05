@@ -1,0 +1,1016 @@
+/* ============================================================
+   Risk Scanner — page-scoped styles
+   All classes prefixed with "rs" to avoid collisions
+   ============================================================ */
+
+/* ── layout shell ─────────────────────────────────────────── */
+.rsShell {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr) 310px;
+  min-height: calc(100vh - 64px);
+  gap: 0;
+}
+
+.rsSidebar {
+  min-height: calc(100vh - 64px);
+  padding: 14px 10px;
+  border-right: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+}
+
+.rsMain {
+  min-width: 0;
+  padding: 20px 18px 40px;
+  overflow-x: hidden;
+  border-right: 1px solid var(--line-soft);
+}
+
+.rsContent {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── right detail panel ───────────────────────────────────── */
+.rsRightPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px);
+  padding: 18px 16px;
+  overflow-y: auto;
+  background: linear-gradient(180deg, oklch(0.14 0.02 255 / 0.98), oklch(0.11 0.016 255 / 0.98));
+}
+
+/* ── page header ──────────────────────────────────────────── */
+.rsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.rsHeaderLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rsHeaderTitle {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--red) 0%, var(--amber) 60%, var(--cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.rsSubtitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.rsLastScan {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: oklch(0.13 0.018 255);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rsLastScan svg {
+  color: var(--cyan);
+}
+
+/* ── stat cards ───────────────────────────────────────────── */
+.rsStatCards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.rsStatCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 80px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.17 0.024 255 / 0.96), oklch(0.13 0.018 255 / 0.98));
+  overflow: hidden;
+  transition: border-color 150ms;
+}
+
+.rsStatCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 200ms;
+}
+
+.rsStatCard:hover {
+  border-color: oklch(0.52 0.14 210 / 0.42);
+}
+
+.rsStatCard:hover::before {
+  opacity: 1;
+  background: radial-gradient(circle at 0% 50%, oklch(0.72 0.17 210 / 0.06), transparent 70%);
+}
+
+.rsStatCard.green { border-left: 2px solid var(--green); }
+.rsStatCard.amber { border-left: 2px solid var(--amber); }
+.rsStatCard.red   { border-left: 2px solid var(--red); }
+.rsStatCard.cyan  { border-left: 2px solid var(--cyan); }
+
+.rsStatIcon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.rsStatIcon.green { color: var(--green); background: oklch(0.2 0.06 151 / 0.55); }
+.rsStatIcon.amber { color: var(--amber); background: oklch(0.22 0.05 83 / 0.55); }
+.rsStatIcon.red   { color: var(--red);   background: oklch(0.2 0.06 25 / 0.55); }
+.rsStatIcon.cyan  { color: var(--cyan);  background: oklch(0.2 0.07 210 / 0.55); }
+
+.rsStatBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rsStatVal {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rsStatCard.green .rsStatVal { color: var(--green); }
+.rsStatCard.amber .rsStatVal { color: var(--amber); }
+.rsStatCard.red   .rsStatVal { color: var(--red); }
+.rsStatCard.cyan  .rsStatVal { color: var(--cyan); }
+
+.rsStatLabel {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── filter tabs ──────────────────────────────────────────── */
+.rsFilterTabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 38px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: oklch(0.12 0.018 255);
+  width: fit-content;
+}
+
+.rsFilterTab {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 150ms, border-color 150ms, color 150ms;
+  white-space: nowrap;
+}
+
+.rsFilterTab:hover {
+  color: var(--text);
+  background: oklch(0.19 0.025 255);
+}
+
+.rsFilterTab.active {
+  color: var(--text);
+  border-color: oklch(0.56 0.17 210 / 0.62);
+  background: oklch(0.21 0.055 235);
+}
+
+/* ── table ────────────────────────────────────────────────── */
+.rsTableWrap {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+}
+
+.rsTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.rsTh {
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+  background: oklch(0.13 0.018 255);
+}
+
+.rsTh:first-child { padding-left: 16px; }
+.rsTh:last-child  { padding-right: 16px; }
+
+.rsTr {
+  border-bottom: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: background 80ms;
+}
+
+.rsTr:last-child {
+  border-bottom: 0;
+}
+
+.rsTr:hover {
+  background: oklch(0.21 0.028 255 / 0.55);
+}
+
+.rsTr.selected {
+  background: oklch(0.22 0.055 235 / 0.62);
+  border-bottom-color: oklch(0.56 0.17 210 / 0.3);
+}
+
+.rsTd {
+  height: 52px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rsTd:first-child { padding-left: 16px; }
+.rsTd:last-child  { padding-right: 16px; }
+
+/* ── token cell ───────────────────────────────────────────── */
+.rsTokenCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rsTokenLogo {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cyan);
+  background: oklch(0.17 0.04 210);
+  box-shadow: inset 0 0 0 1px currentColor, 0 0 12px currentColor;
+}
+
+.rsTokenLogo.tone-green  { color: var(--green);  background: oklch(0.18 0.04 151); }
+.rsTokenLogo.tone-amber  { color: var(--amber);  background: oklch(0.18 0.04 83); }
+.rsTokenLogo.tone-red    { color: var(--red);    background: oklch(0.18 0.04 25); }
+.rsTokenLogo.tone-violet { color: var(--violet); background: oklch(0.18 0.05 285); }
+.rsTokenLogo.tone-cyan   { color: var(--cyan);   background: oklch(0.17 0.04 210); }
+
+.rsTokenName {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rsTokenSub {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── risk score donut ─────────────────────────────────────── */
+.rsRiskScore {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rsDonutWrap {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.rsDonutSvg {
+  width: 36px;
+  height: 36px;
+  transform: rotate(-90deg);
+}
+
+.rsDonutBg {
+  fill: none;
+  stroke: oklch(0.28 0.03 255);
+  stroke-width: 3.5;
+}
+
+.rsDonutFill {
+  fill: none;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 600ms ease-out;
+}
+
+.rsDonutFill.score-safe    { stroke: var(--green); }
+.rsDonutFill.score-medium  { stroke: var(--amber); }
+.rsDonutFill.score-high    { stroke: var(--red); }
+.rsDonutFill.score-extreme { stroke: oklch(0.62 0.26 25); }
+
+.rsDonutLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.rsScoreNum {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── risk factor chips ────────────────────────────────────── */
+.rsFactorChips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.rsFactorChip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rsFactorChip.safe {
+  color: var(--green);
+  background: oklch(0.18 0.05 151 / 0.7);
+  border: 1px solid oklch(0.5 0.15 151 / 0.35);
+}
+
+.rsFactorChip.info {
+  color: var(--cyan);
+  background: oklch(0.18 0.06 210 / 0.7);
+  border: 1px solid oklch(0.55 0.14 210 / 0.35);
+}
+
+.rsFactorChip.warning {
+  color: var(--amber);
+  background: oklch(0.2 0.05 83 / 0.7);
+  border: 1px solid oklch(0.6 0.14 83 / 0.35);
+}
+
+.rsFactorChip.critical {
+  color: var(--red);
+  background: oklch(0.18 0.06 25 / 0.7);
+  border: 1px solid oklch(0.55 0.17 25 / 0.35);
+}
+
+.rsMoreChip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line-soft);
+  color: var(--faint);
+  background: oklch(0.16 0.02 255 / 0.6);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── actions cell ─────────────────────────────────────────── */
+.rsActionIcon {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--muted);
+  background: oklch(0.14 0.018 255);
+  cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+
+.rsActionIcon:hover {
+  border-color: oklch(0.58 0.17 210 / 0.72);
+  color: var(--cyan);
+}
+
+/* ── loading skeleton ─────────────────────────────────────── */
+.rsSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rsSkeletonRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+}
+
+@keyframes rsPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.75; }
+}
+
+.rsSkeletonBlock {
+  height: 12px;
+  border-radius: 4px;
+  background: oklch(0.3 0.03 255);
+  animation: rsPulse 1.6s ease-in-out infinite;
+}
+
+/* ── error state ──────────────────────────────────────────── */
+.rsError {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 240px;
+  border: 1px solid oklch(0.55 0.17 25 / 0.35);
+  border-radius: var(--radius);
+  background: oklch(0.14 0.03 25 / 0.22);
+  color: var(--muted);
+  text-align: center;
+  padding: 32px;
+}
+
+.rsErrorIcon {
+  color: var(--red);
+}
+
+.rsErrorTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.rsRetryBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid oklch(0.56 0.17 210 / 0.62);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: oklch(0.2 0.055 235);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 150ms, border-color 150ms;
+}
+
+.rsRetryBtn:hover {
+  background: oklch(0.25 0.065 235);
+  border-color: oklch(0.65 0.2 210 / 0.72);
+}
+
+/* ── empty state ──────────────────────────────────────────── */
+.rsEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 200px;
+  color: var(--faint);
+  text-align: center;
+}
+
+/* ── right detail panel internals ────────────────────────── */
+.rsDetailPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+}
+
+.rsDetailEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+  min-height: 300px;
+  color: var(--faint);
+  text-align: center;
+}
+
+.rsDetailEmptyIcon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 50%;
+  color: var(--faint);
+  background: oklch(0.14 0.018 255);
+}
+
+.rsDetailEmptyText {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 180px;
+  line-height: 1.5;
+}
+
+/* detail panel header */
+.rsDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.rsDetailTokenLogo {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--cyan);
+  background: oklch(0.17 0.04 210);
+  box-shadow: inset 0 0 0 1px currentColor, 0 0 16px currentColor;
+}
+
+.rsDetailTokenLogo.tone-green  { color: var(--green);  background: oklch(0.18 0.04 151); }
+.rsDetailTokenLogo.tone-amber  { color: var(--amber);  background: oklch(0.18 0.04 83); }
+.rsDetailTokenLogo.tone-red    { color: var(--red);    background: oklch(0.18 0.04 25); }
+.rsDetailTokenLogo.tone-violet { color: var(--violet); background: oklch(0.18 0.05 285); }
+.rsDetailTokenLogo.tone-cyan   { color: var(--cyan);   background: oklch(0.17 0.04 210); }
+
+.rsDetailTokenInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.rsDetailSymbol {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.rsDetailName {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rsDetailPrice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.rsDetailPriceVal {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rsDetailChange {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rsDetailChange.pos { color: var(--green); }
+.rsDetailChange.neg { color: var(--red); }
+
+/* gauge section */
+.rsDetailGauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: oklch(0.12 0.018 255);
+  text-align: center;
+}
+
+.rsDetailGaugeLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rsGaugeSvgWrap {
+  position: relative;
+  width: 90px;
+  height: 90px;
+}
+
+.rsGaugeSvg {
+  width: 90px;
+  height: 90px;
+  transform: rotate(-90deg);
+}
+
+.rsGaugeBg {
+  fill: none;
+  stroke: oklch(0.28 0.03 255);
+  stroke-width: 8;
+}
+
+.rsGaugeFill {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dasharray 700ms ease-out;
+}
+
+.rsGaugeFill.score-safe    { stroke: var(--green); }
+.rsGaugeFill.score-medium  { stroke: var(--amber); }
+.rsGaugeFill.score-high    { stroke: var(--red); }
+.rsGaugeFill.score-extreme { stroke: oklch(0.62 0.26 25); }
+
+.rsGaugeCenter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.rsGaugeNum {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1;
+}
+
+.rsGaugeDenom {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.rsRiskLevelBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rsRiskLevelBadge.low     { color: var(--green); background: oklch(0.18 0.05 151 / 0.65); border: 1px solid oklch(0.5 0.15 151 / 0.35); }
+.rsRiskLevelBadge.medium  { color: var(--amber); background: oklch(0.2 0.05 83 / 0.65);   border: 1px solid oklch(0.6 0.14 83 / 0.35); }
+.rsRiskLevelBadge.high    { color: var(--red);   background: oklch(0.18 0.06 25 / 0.65);  border: 1px solid oklch(0.55 0.17 25 / 0.35); }
+.rsRiskLevelBadge.extreme { color: oklch(0.92 0.2 25); background: oklch(0.16 0.07 25 / 0.75); border: 1px solid oklch(0.62 0.22 25 / 0.55); }
+
+/* badge row in detail */
+.rsDetailBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* factor breakdown section */
+.rsSectionTitle {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 8px;
+}
+
+.rsFactorList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rsFactorRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: oklch(0.13 0.018 255);
+}
+
+.rsFactorRow.safe    { border-left: 2px solid var(--green); }
+.rsFactorRow.info    { border-left: 2px solid var(--cyan); }
+.rsFactorRow.warning { border-left: 2px solid var(--amber); }
+.rsFactorRow.critical { border-left: 2px solid var(--red); }
+
+.rsFactorIcon {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.rsFactorRow.safe    .rsFactorIcon { color: var(--green);  background: oklch(0.18 0.05 151 / 0.55); }
+.rsFactorRow.info    .rsFactorIcon { color: var(--cyan);   background: oklch(0.18 0.06 210 / 0.55); }
+.rsFactorRow.warning .rsFactorIcon { color: var(--amber);  background: oklch(0.2 0.05 83 / 0.55); }
+.rsFactorRow.critical .rsFactorIcon { color: var(--red);   background: oklch(0.18 0.06 25 / 0.55); }
+
+.rsFactorText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.rsFactorLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.rsFactorDesc {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* quick actions section */
+.rsQuickActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rsActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 150ms, border-color 150ms, opacity 150ms;
+}
+
+.rsActionBtn.primary {
+  border: 1px solid oklch(0.67 0.2 285 / 0.55);
+  color: var(--text);
+  background: linear-gradient(135deg, oklch(0.38 0.16 285), oklch(0.22 0.06 260));
+}
+
+.rsActionBtn.primary:hover {
+  background: linear-gradient(135deg, oklch(0.44 0.18 285), oklch(0.26 0.08 260));
+  border-color: oklch(0.72 0.22 285 / 0.72);
+}
+
+.rsActionBtn.secondary {
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.rsActionBtn.secondary:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.rsActionBtn.disabled {
+  border: 1px solid var(--line-soft);
+  color: var(--faint);
+  background: oklch(0.13 0.015 255);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ── chain badges in table ────────────────────────────────── */
+.rsChainBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line-soft);
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.rsChainBadge.base { color: oklch(0.8 0.12 260); background: oklch(0.24 0.09 260 / 0.62); }
+.rsChainBadge.eth  { color: oklch(0.82 0.12 275); background: oklch(0.24 0.08 275 / 0.62); }
+.rsChainBadge.bsc  { color: var(--bsc);           background: oklch(0.22 0.05 83 / 0.62); }
+
+/* ── age & volume text ────────────────────────────────────── */
+.rsAgeText {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rsVolText {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rsSwapsText {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ── scrollbar ────────────────────────────────────────────── */
+.rsRightPanel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.rsRightPanel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rsRightPanel::-webkit-scrollbar-thumb {
+  background: oklch(0.32 0.04 255);
+  border-radius: 2px;
+}
+
+.rsRightPanel::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.44 0.06 255);
+}
+
+/* ── responsive ───────────────────────────────────────────── */
+@media (max-width: 1400px) {
+  .rsShell {
+    grid-template-columns: 188px minmax(0, 1fr) 280px;
+  }
+
+  .rsStatCards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .rsShell {
+    grid-template-columns: 188px minmax(0, 1fr);
+  }
+
+  .rsRightPanel {
+    display: none;
+  }
+
+  .rsStatCards {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .rsShell {
+    grid-template-columns: 1fr;
+  }
+
+  .rsSidebar {
+    display: none;
+  }
+
+  .rsStatCards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rsFilterTabs {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .rsShell {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .rsMain {
+    padding: 10px;
+  }
+
+  .rsStatCards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rsTableWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rsTable {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .rsTable th { font-size: 10px; padding: 7px 8px; }
+  .rsTable td { padding: 7px 8px; }
+
+  .rsDetailPanel {
+    display: none;
+  }
+
+  .rsFilterTabs {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Touch targets */
+  .rsFilterTab,
+  .rsChainTab {
+    min-height: 44px;
+  }
+}

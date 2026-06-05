@@ -1,0 +1,1323 @@
+/* ============================================================
+   LaunchesPage — launches.css
+   All classes prefixed with "lp"
+   ============================================================ */
+
+/* ── Layout shell ─────────────────────────────────────────── */
+.lpShell {
+  display: grid;
+  grid-template-columns: 188px 1fr 300px;
+  gap: 14px;
+  min-height: calc(100vh - 64px);
+  padding: 14px;
+}
+
+/* ── Page header ─────────────────────────────────────────── */
+.lpHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.lpHeaderLeft h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.lpHeaderLeft p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.lpTimeframeGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lpTimeframeGroup button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--panel);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 160ms, background 160ms, color 160ms;
+}
+
+.lpTimeframeGroup button:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.lpTimeframeGroup button.lpTfActive {
+  color: var(--text);
+  border-color: oklch(0.56 0.17 210 / 0.62);
+  background: oklch(0.21 0.055 235);
+}
+
+.lpCustomizeBtn {
+  height: 34px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: oklch(0.8 0.14 285);
+  background: linear-gradient(135deg, oklch(0.2 0.06 285), oklch(0.14 0.03 258));
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: opacity 160ms;
+}
+
+.lpCustomizeBtn:hover { opacity: 0.82; }
+
+/* ── Stat cards grid ─────────────────────────────────────── */
+.lpStatGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.lpStatCard {
+  min-height: 82px;
+  padding: 13px 14px 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+}
+
+.lpStatLabel {
+  display: block;
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.lpStatValue {
+  display: block;
+  margin: 6px 0 3px;
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--text);
+}
+
+.lpStatMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lpStatChange {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lpStatChange.positive { color: var(--green); }
+.lpStatChange.negative { color: var(--red); }
+.lpStatChange.neutral  { color: var(--muted); }
+.lpStatChange.amber    { color: var(--amber); }
+
+.lpMiniSparkline {
+  width: 54px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.lpMiniSparkline polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+
+.lpMiniSparkline.green { color: var(--green); }
+.lpMiniSparkline.amber { color: var(--amber); }
+.lpMiniSparkline.red   { color: var(--red); }
+
+/* ── Filter tabs row ─────────────────────────────────────── */
+.lpTabBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.lpTabGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lpTab {
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 160ms, background 160ms, color 160ms;
+}
+
+.lpTab:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  color: var(--text);
+}
+
+.lpTab.lpTabActive {
+  color: var(--text);
+  border-color: oklch(0.62 0.22 285 / 0.68);
+  background: linear-gradient(135deg, oklch(0.26 0.13 285), oklch(0.18 0.06 258));
+}
+
+.lpTabRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lpSortSelect {
+  height: 34px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--panel);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lpViewToggle {
+  display: flex;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.lpViewToggle button {
+  width: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid var(--line-soft);
+  color: var(--muted);
+  background: var(--panel);
+  cursor: pointer;
+  transition: background 160ms, color 160ms;
+}
+
+.lpViewToggle button:last-child {
+  border-right: 0;
+}
+
+.lpViewToggle button.lpViewActive {
+  color: var(--text);
+  background: oklch(0.21 0.055 235);
+}
+
+/* ── Token table ─────────────────────────────────────────── */
+.lpTableWrap {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  margin-bottom: 10px;
+}
+
+.lpTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.lpTable th {
+  height: 36px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  background: oklch(0.12 0.018 255);
+}
+
+.lpTable th:first-child { padding-left: 14px; width: 32px; }
+.lpTable th:last-child  { padding-right: 14px; }
+
+.lpTable td {
+  height: 54px;
+  padding: 0 10px;
+  border-bottom: 1px solid oklch(0.34 0.028 255 / 0.18);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.lpTable td:first-child { padding-left: 14px; }
+.lpTable td:last-child  { padding-right: 14px; }
+
+.lpTable tbody tr {
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.lpTable tbody tr:hover {
+  background: oklch(0.21 0.026 255 / 0.58);
+}
+
+.lpTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Token name cell */
+.lpTokenCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lpTokenLogo {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--cyan);
+  background: oklch(0.17 0.04 210);
+  box-shadow: inset 0 0 0 1px currentColor;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.lpTokenLogo.amber { color: var(--amber); background: oklch(0.18 0.04 83); }
+.lpTokenLogo.violet { color: var(--violet); background: oklch(0.18 0.05 285); }
+.lpTokenLogo.green { color: var(--green); background: oklch(0.18 0.04 151); }
+.lpTokenLogo.rose { color: var(--red); background: oklch(0.18 0.04 25); }
+.lpTokenLogo.blue { color: var(--base); background: oklch(0.18 0.04 260); }
+
+.lpTokenName {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lpTokenPair {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Star favorite column */
+.lpStarBtn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: var(--faint);
+  background: transparent;
+  cursor: pointer;
+  transition: color 150ms;
+}
+
+.lpStarBtn:hover      { color: var(--amber); }
+.lpStarBtn.lpStarred  { color: var(--amber); }
+
+/* Chain badge */
+.lpChainBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.lpChainBadge.base { color: oklch(0.8 0.12 260); background: oklch(0.24 0.09 260 / 0.62); }
+.lpChainBadge.eth  { color: oklch(0.82 0.12 275); background: oklch(0.24 0.08 275 / 0.62); }
+.lpChainBadge.bsc  { color: var(--bsc);           background: oklch(0.22 0.05 83 / 0.62); }
+.lpChainBadge.arb  { color: oklch(0.75 0.16 225); background: oklch(0.22 0.07 225 / 0.62); }
+.lpChainBadge.sol  { color: oklch(0.82 0.18 155); background: oklch(0.22 0.06 155 / 0.62); }
+
+/* Risk badge */
+.lpRiskBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.lpRiskBadge.low       { color: var(--green);  background: oklch(0.2 0.055 151 / 0.55); }
+.lpRiskBadge.medium    { color: var(--amber);  background: oklch(0.22 0.045 83  / 0.55); }
+.lpRiskBadge.high      { color: var(--red);    background: oklch(0.2 0.055 25   / 0.55); }
+.lpRiskBadge.very-high { color: oklch(1 0 0);  background: oklch(0.36 0.16 25   / 0.82); border-color: oklch(0.55 0.2 25 / 0.5); }
+
+/* Liquidity cell */
+.lpLiqCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lpLockIcon  { color: var(--green); }
+.lpWarnIcon  { color: var(--amber); }
+
+/* Smart Score donut */
+.lpScoreCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lpScoreDonut {
+  flex-shrink: 0;
+}
+
+.lpScoreNum {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Actions cell */
+.lpActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lpActionBtn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  transition: border-color 150ms, color 150ms;
+}
+
+.lpActionBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  color: var(--cyan);
+}
+
+/* Load more */
+.lpLoadMore {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 18px;
+  transition: border-color 160ms, color 160ms;
+}
+
+.lpLoadMore:hover {
+  border-color: oklch(0.58 0.12 210 / 0.62);
+  color: var(--text);
+}
+
+/* ── Hot Launch Alerts ticker ────────────────────────────── */
+.lpAlertBand {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  align-items: stretch;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+  min-height: 72px;
+  margin-bottom: 14px;
+}
+
+.lpAlertBandLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-right: 1px solid var(--line-soft);
+  background: oklch(0.13 0.018 255);
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.lpAlertCards {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  gap: 0;
+  scrollbar-width: none;
+}
+
+.lpAlertCards::-webkit-scrollbar { display: none; }
+
+.lpAlertCard {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 16px;
+  border-right: 1px solid var(--line-soft);
+  min-width: 200px;
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.lpAlertCard:hover { background: oklch(0.21 0.026 255 / 0.58); }
+
+.lpAlertType {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+
+.lpAlertType.smart  { color: var(--cyan); }
+.lpAlertType.volume { color: var(--violet); }
+.lpAlertType.new    { color: var(--green); }
+.lpAlertType.locked { color: oklch(0.8 0.14 285); }
+.lpAlertType.grad   { color: var(--amber); }
+
+.lpAlertTitle {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lpAlertDetail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lpAlertTime {
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.lpAlertViewAll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border: 0;
+  border-left: 1px solid var(--line-soft);
+  color: oklch(0.8 0.14 285);
+  background: oklch(0.13 0.018 255);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: opacity 160ms;
+}
+
+.lpAlertViewAll:hover { opacity: 0.8; }
+
+/* ── Right panel ─────────────────────────────────────────── */
+.lpRightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: calc(100vh - 92px);
+}
+
+/* Filter panel */
+.lpFilterPanel {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.lpPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.lpPanelHead h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.lpPanelHead button,
+.lpPanelResetLink {
+  border: 0;
+  background: transparent;
+  color: oklch(0.8 0.14 285);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.lpPanelBody {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lpFilterRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lpFilterLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lpFilterSelect {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--panel);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.lpRiskGroup {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lpRiskBtn {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  transition: border-color 150ms, background 150ms, color 150ms;
+  white-space: nowrap;
+}
+
+.lpRiskBtn:hover {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+  color: var(--text);
+}
+
+.lpRiskBtn.lpRiskActive {
+  color: var(--text);
+  border-color: oklch(0.56 0.17 210 / 0.62);
+  background: oklch(0.21 0.055 235);
+}
+
+.lpMinLiqInput {
+  position: relative;
+}
+
+.lpMinLiqInput span {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.lpMinLiqInput input {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px 0 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: var(--panel);
+  font-size: 13px;
+  outline: 0;
+  transition: border-color 150ms;
+}
+
+.lpMinLiqInput input:focus {
+  border-color: oklch(0.58 0.12 210 / 0.72);
+}
+
+.lpMinLiqInput input::placeholder {
+  color: var(--faint);
+}
+
+/* Toggle */
+.lpToggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lpToggleLabel {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lpToggle {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border: 0;
+  border-radius: 11px;
+  background: oklch(0.28 0.12 285);
+  cursor: pointer;
+  transition: background 200ms;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px oklch(0.62 0.22 285 / 0.32);
+}
+
+.lpToggle::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 200ms;
+}
+
+.lpToggle.lpToggleOn {
+  background: oklch(0.55 0.22 285);
+}
+
+.lpToggle.lpToggleOn::after {
+  transform: translateX(16px);
+}
+
+/* Apply button */
+.lpApplyBtn {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid oklch(0.67 0.2 285 / 0.55);
+  border-radius: var(--radius);
+  color: var(--text);
+  background: linear-gradient(135deg, oklch(0.42 0.18 285), oklch(0.25 0.08 260));
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  transition: opacity 160ms;
+}
+
+.lpApplyBtn:hover { opacity: 0.88; }
+
+/* ── Trends mini-panel ───────────────────────────────────── */
+.lpTrendsPanel {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.lpTrendsList {
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.lpTrendRow {
+  display: grid;
+  grid-template-columns: 70px 1fr 44px 54px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.lpTrendName {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.lpTrendBar {
+  height: 6px;
+  border-radius: 3px;
+  min-width: 4px;
+}
+
+.lpTrendCount {
+  color: var(--muted);
+  text-align: right;
+}
+
+.lpTrendPct {
+  font-weight: 700;
+  text-align: right;
+}
+
+.lpTrendPct.positive { color: var(--green); }
+.lpTrendPct.negative { color: var(--red); }
+
+/* ── Quality donut ───────────────────────────────────────── */
+.lpQualityPanel {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.lpQualityBody {
+  padding: 12px 14px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.lpQualityDonut {
+  flex-shrink: 0;
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, oklch(0.12 0.018 255) 0 54%, transparent 55%),
+    conic-gradient(
+      var(--green)  0% 58.3%,
+      var(--amber)  58.3% 79.7%,
+      var(--orange) 79.7% 90%,
+      var(--red)    90% 100%
+    );
+}
+
+.lpQualityLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lpLegendItem {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.lpLegendDot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.lpLegendLabel { color: var(--muted); flex: 1; }
+.lpLegendPct   { color: var(--text); font-weight: 700; }
+
+/* ── Graduated panel ────────────────────────────────────── */
+.lpGradPanel {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, oklch(0.16 0.022 255 / 0.96), oklch(0.12 0.018 255 / 0.98));
+  overflow: hidden;
+}
+
+.lpGradPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.lpGradPanelHead h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.lpGradViewAll {
+  border: 0;
+  background: transparent;
+  color: oklch(0.8 0.14 285);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.lpGradList {
+  padding: 8px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lpGradRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  transition: background 150ms;
+}
+
+.lpGradRow:hover { background: oklch(0.18 0.026 255); }
+
+.lpGradInfo { flex: 1; min-width: 0; }
+
+.lpGradName {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lpGradMeta {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lpGradMcap {
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lpGradBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--amber);
+  background: oklch(0.22 0.045 83 / 0.55);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ── Main content area ───────────────────────────────────── */
+.lpContent {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Sidebar fixes ───────────────────────────────────────── */
+.lpSidebarWrap {
+  grid-column: 1;
+}
+
+/* ── Scrollable main ─────────────────────────────────────── */
+.lpMain {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Panel header dropdown ─────────────────────────────────── */
+.lpDropdownWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lpDropdownBtn {
+  height: 26px;
+  padding: 0 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Info icon ─────────────────────────────────────────── */
+.lpInfoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--faint);
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 800;
+  cursor: help;
+}
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 1400px) {
+  .lpStatGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1200px) {
+  .lpShell {
+    grid-template-columns: 188px 1fr;
+  }
+
+  .lpRightPanel {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    min-height: auto;
+  }
+
+  .lpFilterPanel { grid-column: 1 / -1; }
+}
+
+@media (max-width: 900px) {
+  .lpShell {
+    grid-template-columns: 1fr;
+  }
+
+  .lpStatGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .lpShell {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .lpSidebar {
+    display: none;
+  }
+
+  .lpTopbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .lpStatGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .lpTokenTable {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .lpTable {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .lpTable th { font-size: 10px; padding: 7px 8px; }
+  .lpTable td { padding: 7px 8px; }
+
+  .lpRightPanel {
+    display: none;
+  }
+
+  .lpFilterPanel {
+    display: none;
+  }
+
+  /* Touch targets */
+  .lpTabBtn,
+  .lpChainBtn,
+  .lpFilterToggle {
+    min-height: 44px;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   Platform badge (inline in table rows)
+══════════════════════════════════════════════════════════ */
+
+.lpPlatformBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.lpPlatformBadge.clanker {
+  color: oklch(0.9 0.12 210);
+  background: oklch(0.22 0.06 210 / 0.6);
+  border: 1px solid oklch(0.45 0.12 210 / 0.5);
+}
+
+.lpPlatformBadge.bankr {
+  color: oklch(0.9 0.14 145);
+  background: oklch(0.2 0.06 145 / 0.6);
+  border: 1px solid oklch(0.45 0.14 145 / 0.5);
+}
+
+/* ══════════════════════════════════════════════════════════
+   Platform sections container
+══════════════════════════════════════════════════════════ */
+
+.lpPlatformSections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+/* ── Individual platform section ── */
+.lpPlatformSection {
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+}
+
+.lpPlatformSection.clanker {
+  background: linear-gradient(135deg, oklch(0.16 0.04 220 / 0.9), oklch(0.12 0.02 255 / 0.95));
+  border-color: oklch(0.38 0.1 210 / 0.4);
+}
+
+.lpPlatformSection.bankr {
+  background: linear-gradient(135deg, oklch(0.16 0.04 145 / 0.9), oklch(0.12 0.02 255 / 0.95));
+  border-color: oklch(0.38 0.12 145 / 0.4);
+}
+
+.lpPlatformSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid oklch(0.3 0.02 255 / 0.35);
+}
+
+.lpPlatformSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+
+.lpPlatformIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lpPlatformChainPill {
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: oklch(0.28 0.1 260 / 0.5);
+  border: 1px solid oklch(0.46 0.14 260 / 0.4);
+  color: oklch(0.78 0.14 260);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lpPlatformCount {
+  color: var(--faint);
+  font-size: 11px;
+}
+
+/* ── Token cards strip ── */
+.lpPlatformCards {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.lpPlatformCards::-webkit-scrollbar { display: none; }
+
+.lpPlatformCard {
+  flex-shrink: 0;
+  width: 110px;
+  padding: 10px 10px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: oklch(0.12 0.018 255 / 0.8);
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: background 120ms, border-color 120ms;
+}
+
+.lpPlatformCard:hover {
+  background: oklch(0.18 0.028 255 / 0.9);
+  border-color: oklch(0.42 0.08 255 / 0.5);
+}
+
+.lpPlatformCard:active { opacity: 0.75; transition: none; }
+
+.lpPlatformCardSymbol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lpPlatformCardLogo {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.lpPlatformCardLogo.clanker {
+  background: oklch(0.26 0.1 210 / 0.7);
+  color: oklch(0.88 0.12 210);
+}
+
+.lpPlatformCardLogo.bankr {
+  background: oklch(0.24 0.1 145 / 0.7);
+  color: oklch(0.88 0.14 145);
+}
+
+.lpPlatformCardTicker {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 64px;
+}
+
+.lpPlatformCardChange {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lpPlatformCardChange.up   { color: var(--green); }
+.lpPlatformCardChange.down { color: var(--red);   }
+
+.lpPlatformCardVol {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── Responsive ── */
+@media (max-width: 760px) {
+  .lpPlatformSections {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .lpPlatformCard { width: 96px; }
+}
