@@ -49,10 +49,19 @@ export type TokenDetail = {
   priceUsd: number;
   priceChange24h: number;
   volume24hUsd: number;
+  liquidityUsd: number;
   swaps24h: number;
   buys24h: number;
   sells24h: number;
   lastActivityAt: string;
+  // Enriched fields
+  launchPlatform: string | null;
+  launchSource: string;
+  dex: string;
+  riskScore: number;
+  riskLevel: "Low" | "Medium" | "High" | "Extreme";
+  lifecycle: "hot" | "warm" | "cold";
+  ageMinutes: number;
 };
 
 export type TokenSwap = {

@@ -6,6 +6,8 @@ import {
   Radar, RefreshCw, Search, Settings, Shield, Star, TrendingUp, Wallet, Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { fetchTokenCandles, fetchTokenSwaps } from "../lib/api";
 import type { Candle, ChainKey, TokenDetail, TokenSwap } from "../lib/types";
 import { CandlestickChart, type OhlcBar } from "./CandlestickChart";
@@ -20,8 +22,22 @@ export function TokenPage({ token }: Props) {
   const [ohlc, setOhlc] = useState<OhlcBar>(null);
   const [copied, setCopied] = useState(false);
   const [txnOpen, setTxnOpen] = useState(true);
+  const [activeTxTab, setActiveTxTab] = useState<"txns" | "traders" | "holders" | "lp" | "bubbles">("txns");
   const [txPanelHeight, setTxPanelHeight] = useState(220);
+  const router = useRouter();
+  const starKey = `cs:token:starred:${token.chain}:${token.address}`;
   const [starred, setStarred] = useState(false);
+  // Load + persist star state
+  useEffect(() => {
+    try { setStarred(localStorage.getItem(starKey) === "1"); } catch {}
+  }, [starKey]);
+  const toggleStar = useCallback(() => {
+    setStarred(prev => {
+      const next = !prev;
+      try { next ? localStorage.setItem(starKey, "1") : localStorage.removeItem(starKey); } catch {}
+      return next;
+    });
+  }, [starKey]);
   const [loadingCandles, setLoadingCandles] = useState(true);
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
@@ -151,38 +167,82 @@ export function TokenPage({ token }: Props) {
   const priceUp = token.priceChange24h >= 0;
   const priceInQuote = quotePriceUsd > 0 ? token.priceUsd / quotePriceUsd : 0;
 
-  // Derived signals
-  const riskScore = token.priceChange24h > 50 ? 72 : token.priceChange24h < -30 ? 65 : 31;
-  const riskLevel = riskScore < 40 ? "Low Risk" : riskScore < 65 ? "Medium Risk" : "High Risk";
+  // Risk — use real values from API
+  const riskScore = token.riskScore;
+  const riskLevelLabel = `${token.riskLevel} Risk`;
   const buyerPressure = Math.round(buyRatio * 100);
   const pressureLabel = buyerPressure >= 60 ? "High" : buyerPressure >= 40 ? "Moderate" : "Low";
 
+  // Top traders — derived client-side from swap data
+  const topTraders = useMemo(() => {
+    const map = new Map<string, { address: string; buyVol: number; sellVol: number; trades: number }>();
+    swaps.forEach(swap => {
+      if (!swap.sender) return;
+      const v = parseSwap(swap, token.address, token.decimals);
+      const entry = map.get(swap.sender) ?? { address: swap.sender, buyVol: 0, sellVol: 0, trades: 0 };
+      if (v.isBuy) entry.buyVol += v.usdValue; else entry.sellVol += v.usdValue;
+      entry.trades++;
+      map.set(swap.sender, entry);
+    });
+    return [...map.values()].sort((a, b) => (b.buyVol + b.sellVol) - (a.buyVol + a.sellVol)).slice(0, 10);
+  }, [swaps, token.address, token.decimals]);
+
   return (
     <div className="tpShell">
+      {/* Top Navbar */}
+      <header className="topNavbar" style={{ gridColumn: "1 / -1" }}>
+        <div className="brandLockup">
+          <span className="brandOrb"><Radar size={22} /></span>
+          <div><strong>Chain Screener</strong><span>Launch radar</span></div>
+        </div>
+        <label className="commandSearch">
+          <Search size={18} />
+          <input placeholder="Search token, wallet, contract, or address..." />
+          <kbd>⌘ K</kbd>
+        </label>
+        <div className="topActions">
+          <button className="topButton" type="button"><Bell size={16} /> Alerts</button>
+          <button className="topButton" type="button"><Star size={16} /> Watchlist</button>
+          <ConnectButton.Custom>
+            {({ account, chain, openAccountModal, openConnectModal, mounted }) => {
+              const connected = mounted && account && chain;
+              return (
+                <button className="walletButton" type="button" onClick={connected ? openAccountModal : openConnectModal}>
+                  <span style={{ width: 22, height: 22, borderRadius: "50%", background: "oklch(0.22 0.07 260)", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800, color: "oklch(0.78 0.14 260)" }}>
+                    {connected ? account.displayName.slice(0, 2).toUpperCase() : "0x"}
+                  </span>
+                  {connected ? account.displayName : "Connect Wallet"}
+                </button>
+              );
+            }}
+          </ConnectButton.Custom>
+        </div>
+      </header>
+
       {/* Sidebar */}
       <aside className="tpSidebar">
         <nav className="tpNav">
           <div className="tpNavGroup">
-            <a href="/" className="tpNavItem active"><Radar size={15} /><span>Radar</span></a>
-            <a href="/" className="tpNavItem"><Activity size={15} /><span>Launches</span></a>
+            <a href="/" className="tpNavItem"><Radar size={15} /><span>Radar</span></a>
+            <a href="/launches" className="tpNavItem"><Activity size={15} /><span>Launches</span></a>
             <a href="/" className="tpNavItem"><Star size={15} /><span>Watchlist</span></a>
             <a href="/" className="tpNavItem"><Gem size={15} /><span>Opportunities</span></a>
             <a href="/" className="tpNavItem"><Bell size={15} /><span>Alerts</span></a>
           </div>
           <div className="tpNavSection">INTELLIGENCE</div>
           <div className="tpNavGroup">
-            <a href="/" className="tpNavItem"><Zap size={15} /><span>Smart Money</span></a>
+            <a href="/smart-money" className="tpNavItem"><Zap size={15} /><span>Smart Money</span></a>
             <a href="/" className="tpNavItem"><Wallet size={15} /><span>Wallet Explorer</span></a>
-            <a href="/" className="tpNavItem"><Crosshair size={15} /><span>Holder Analysis</span></a>
-            <a href="/" className="tpNavItem"><Shield size={15} /><span>Risk Scanner</span></a>
+            <a href="/holder-analysis" className="tpNavItem"><Crosshair size={15} /><span>Holder Analysis</span></a>
+            <a href="/risk-scanner" className="tpNavItem"><Shield size={15} /><span>Risk Scanner</span></a>
           </div>
           <div className="tpNavSection">TOOLS</div>
           <div className="tpNavGroup">
             <a href="/" className="tpNavItem"><Layers size={15} /><span>DEX Pools</span></a>
             <a href="/" className="tpNavItem"><Lock size={15} /><span>Liquidity Locks</span></a>
             <a href="/" className="tpNavItem"><Database size={15} /><span>Contract Analyzer</span></a>
-            <a href="/" className="tpNavItem"><TrendingUp size={15} /><span>Top Gainers</span></a>
-            <a href="/" className="tpNavItem"><CircleDollarSign size={15} /><span>Top Volume</span></a>
+            <a href="/top-gainers" className="tpNavItem"><TrendingUp size={15} /><span>Top Gainers</span></a>
+            <a href="/top-gainers?sort=volume" className="tpNavItem"><CircleDollarSign size={15} /><span>Top Volume</span></a>
           </div>
           <div className="tpNavSection">SETTINGS</div>
           <div className="tpNavGroup">
@@ -209,7 +269,7 @@ export function TokenPage({ token }: Props) {
         {/* Token header */}
         <div className="tpHeader">
           <div className="tpHeaderTop">
-            <a href="/" className="tpBack"><ArrowLeft size={14} /> Back to Radar</a>
+            <button type="button" className="tpBack" onClick={() => router.back()}><ArrowLeft size={14} /> Back</button>
           </div>
 
           <div className="tpHeaderMid">
@@ -225,7 +285,7 @@ export function TokenPage({ token }: Props) {
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                   </button>
                   <span className="tpLiveBadge"><i />LIVE</span>
-                  <button type="button" className={`tpStarBtn${starred ? " starred" : ""}`} onClick={() => setStarred(!starred)}>
+                  <button type="button" className={`tpStarBtn${starred ? " starred" : ""}`} onClick={toggleStar}>
                     <Star size={15} fill={starred ? "currentColor" : "none"} />
                   </button>
                 </div>
@@ -246,7 +306,7 @@ export function TokenPage({ token }: Props) {
 
             {/* Gauge widgets */}
             <div className="tpGauges">
-              <GaugeWidget label="Risk Score" value={riskScore} max={100} caption={riskLevel} tone={riskScore < 40 ? "green" : riskScore < 65 ? "amber" : "red"} suffix="/100" />
+              <GaugeWidget label="Risk Score" value={riskScore} max={100} caption={riskLevelLabel} tone={riskScore < 40 ? "green" : riskScore < 65 ? "amber" : "red"} suffix="/100" />
               <GaugeWidget label="Buyer Pressure" value={buyerPressure} max={100} caption={pressureLabel} tone={buyerPressure >= 55 ? "green" : "amber"} suffix="%" />
               <SmartMoneyWidget label="Smart Money Interest" value="Building" detail={`${token.buys24h} wallets`} />
             </div>
@@ -256,10 +316,10 @@ export function TokenPage({ token }: Props) {
           <div className="tpStatChips">
             <StatChip label="Market Cap" value={token.marketCapUsd > 0 ? money(token.marketCapUsd) : "—"} />
             <StatChip label="Volume (24H)" value={money(token.volume24hUsd)} trend="up" />
-            <StatChip label="Liquidity" value="—" />
-            <StatChip label="Holders" value="—" />
+            <StatChip label="Liquidity" value={token.liquidityUsd > 0 ? money(token.liquidityUsd) : "—"} />
+            <StatChip label="Holders" value="—" note="indexer pending" />
             <StatChip label="Age" value={firstSwapAge} />
-            <StatChip label="FDV" value={token.marketCapUsd > 0 ? money(token.marketCapUsd) : "—"} />
+            <StatChip label="FDV" value={token.totalSupply && token.marketCapUsd > 0 ? money(token.marketCapUsd) : "—"} />
           </div>
         </div>
 
@@ -300,55 +360,111 @@ export function TokenPage({ token }: Props) {
             {/* Transactions */}
             <div className="tpTxPanel" style={{ height: txnOpen ? txPanelHeight : 38 }}>
               <div className="tpTxBar">
-                <button type="button" className="tpTxTab active">Transactions</button>
-                <button type="button" className="tpTxTab">Top Traders</button>
-                <button type="button" className="tpTxTab">Holders</button>
-                <button type="button" className="tpTxTab">Liquidity Providers</button>
-                <button type="button" className="tpTxTab">Bubble Maps</button>
+                <button type="button" className={`tpTxTab ${activeTxTab === "txns" ? "active" : ""}`} onClick={() => setActiveTxTab("txns")}>Transactions</button>
+                <button type="button" className={`tpTxTab ${activeTxTab === "traders" ? "active" : ""}`} onClick={() => setActiveTxTab("traders")}>Top Traders</button>
+                <button type="button" className={`tpTxTab ${activeTxTab === "holders" ? "active" : ""}`} onClick={() => setActiveTxTab("holders")}>Holders</button>
+                <button type="button" className={`tpTxTab ${activeTxTab === "lp" ? "active" : ""}`} onClick={() => setActiveTxTab("lp")}>Liquidity Providers</button>
+                <button type="button" className={`tpTxTab ${activeTxTab === "bubbles" ? "active" : ""}`} onClick={() => setActiveTxTab("bubbles")}>Bubble Maps</button>
                 <button type="button" className="tpTxToggle" onClick={() => setTxnOpen(!txnOpen)}>{txnOpen ? "▼" : "▲"}</button>
               </div>
               {txnOpen && (
                 <div className="tpTxScroll">
-                  <table className="tpTxTable">
-                    <thead>
-                      <tr>
-                        <th>TIME</th><th>TYPE</th><th>USD</th><th>{token.symbol}</th>
-                        <th>{quoteSymbol}</th><th>PRICE</th><th>TRADER</th><th>TXN</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {swaps.length === 0 && <tr><td colSpan={8} className="tpTxEmpty">No transactions indexed yet</td></tr>}
-                      {swaps.map((swap, i) => {
-                        const v = parseSwap(swap, token.address, token.decimals);
-                        const badge = getTxBadge(v.usdValue, v.isBuy);
-                        return (
-                          <tr key={`${swap.txHash}-${i}`} className={v.isBuy ? "tpBuyRow" : "tpSellRow"}>
-                            <td className="tpTxTime">{timeAgo(swap.observedAt)}</td>
-                            <td><span className={`tpTxType ${v.isBuy ? "buy" : "sell"}`}>{v.isBuy ? "Buy" : "Sell"}</span></td>
-                            <td className={v.isBuy ? "up" : "dn"}>{money(v.usdValue)}</td>
-                            <td>{fmtAmt(v.tokenAmount)}</td>
-                            <td>{fmtAmt(v.quoteAmount)}</td>
-                            <td>{formatPricePlain(v.priceUsd)}</td>
-                            <td>
-                              <div className="tpTraderCell">
-                                {swap.sender
-                                  ? <a className="tpTxLink" href={`${explorer}/address/${swap.sender}`} target="_blank" rel="noopener noreferrer">{shortAddr(swap.sender)}</a>
-                                  : "—"}
-                                {badge && <span className={`tpWalletBadge ${badge.toLowerCase()}`}>{badge}</span>}
-                              </div>
-                            </td>
-                            <td>
-                              <a className="tpTxIconLink" href={`${explorer}/tx/${swap.txHash}`} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink size={12} />
-                              </a>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {swaps.length > 0 && (
-                    <div className="tpViewAll">View Full Transactions →</div>
+                  {/* ── Transactions ── */}
+                  {activeTxTab === "txns" && (
+                    <table className="tpTxTable">
+                      <thead>
+                        <tr>
+                          <th>TIME</th><th>TYPE</th><th>USD</th><th>{token.symbol}</th>
+                          <th>{quoteSymbol}</th><th>PRICE</th><th>TRADER</th><th>TXN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {swaps.length === 0 && <tr><td colSpan={8} className="tpTxEmpty">No transactions indexed yet</td></tr>}
+                        {swaps.map((swap, i) => {
+                          const v = parseSwap(swap, token.address, token.decimals);
+                          const badge = getTxBadge(v.usdValue, v.isBuy);
+                          return (
+                            <tr key={`${swap.txHash}-${i}`} className={v.isBuy ? "tpBuyRow" : "tpSellRow"}>
+                              <td className="tpTxTime">{timeAgo(swap.observedAt)}</td>
+                              <td><span className={`tpTxType ${v.isBuy ? "buy" : "sell"}`}>{v.isBuy ? "Buy" : "Sell"}</span></td>
+                              <td className={v.isBuy ? "up" : "dn"}>{money(v.usdValue)}</td>
+                              <td>{fmtAmt(v.tokenAmount)}</td>
+                              <td>{fmtAmt(v.quoteAmount)}</td>
+                              <td>{formatPricePlain(v.priceUsd)}</td>
+                              <td>
+                                <div className="tpTraderCell">
+                                  {swap.sender
+                                    ? <a className="tpTxLink" href={`${explorer}/address/${swap.sender}`} target="_blank" rel="noopener noreferrer">{shortAddr(swap.sender)}</a>
+                                    : "—"}
+                                  {badge && <span className={`tpWalletBadge ${badge.toLowerCase()}`}>{badge}</span>}
+                                </div>
+                              </td>
+                              <td>
+                                <a className="tpTxIconLink" href={`${explorer}/tx/${swap.txHash}`} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink size={12} />
+                                </a>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* ── Top Traders (derived from swap data) ── */}
+                  {activeTxTab === "traders" && (
+                    <table className="tpTxTable">
+                      <thead>
+                        <tr><th>#</th><th>TRADER</th><th>BUY VOL</th><th>SELL VOL</th><th>TRADES</th><th>NET</th></tr>
+                      </thead>
+                      <tbody>
+                        {topTraders.length === 0 && <tr><td colSpan={6} className="tpTxEmpty">No swap data yet</td></tr>}
+                        {topTraders.map((t, i) => {
+                          const net = t.buyVol - t.sellVol;
+                          return (
+                            <tr key={t.address}>
+                              <td className="tpTxTime">{i + 1}</td>
+                              <td><a className="tpTxLink" href={`${explorer}/address/${t.address}`} target="_blank" rel="noopener noreferrer">{shortAddr(t.address)}</a></td>
+                              <td className="up">{money(t.buyVol)}</td>
+                              <td className="dn">{money(t.sellVol)}</td>
+                              <td>{t.trades}</td>
+                              <td className={net >= 0 ? "up" : "dn"}>{net >= 0 ? "+" : ""}{money(net)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* ── Holders → link to holder analysis ── */}
+                  {activeTxTab === "holders" && (
+                    <div className="tpTabPlaceholder">
+                      <span>Full holder distribution is available in Holder Analysis</span>
+                      <a href={`/holder-analysis?chain=${token.chain}&address=${token.address}`} className="tpTabAction">
+                        Open Holder Analysis →
+                      </a>
+                    </div>
+                  )}
+
+                  {/* ── Liquidity Providers — Coming Soon ── */}
+                  {activeTxTab === "lp" && (
+                    <div className="tpTabPlaceholder">
+                      <span>🚧 Liquidity provider tracking coming soon</span>
+                    </div>
+                  )}
+
+                  {/* ── Bubble Maps — external link ── */}
+                  {activeTxTab === "bubbles" && (
+                    <div className="tpTabPlaceholder">
+                      <span>Visualise wallet clustering for this token</span>
+                      <a
+                        href={`https://app.bubblemaps.io/${token.chain}/token/${token.address}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="tpTabAction"
+                      >
+                        Open on Bubblemaps ↗
+                      </a>
+                    </div>
                   )}
                 </div>
               )}
@@ -374,9 +490,9 @@ export function TokenPage({ token }: Props) {
                 <span className="tpSupply">{token.totalSupply ? fmtSupply(token.totalSupply, token.decimals, token.symbol) : "—"}</span>
               </OverviewRow>
               <OverviewRow label="Circulating Supply">
-                <span className="tpSupply">{token.totalSupply ? fmtSupply(token.totalSupply, token.decimals, token.symbol) : "—"}</span>
+                <span className="tpSupply tpMuted">—</span>
               </OverviewRow>
-              <OverviewRow label="Launch Source"><span className="tpMuted">On-chain</span></OverviewRow>
+              <OverviewRow label="Launch Source"><span className="tpMuted">{token.launchSource}</span></OverviewRow>
               <OverviewRow label="First Swap"><span className="tpMuted">{firstSwapAge}</span></OverviewRow>
               <OverviewRow label="Chain">
                 <span className={`tpChainTag sm ${token.chain}`}>{chainLabel(token.chain)}</span>
@@ -395,7 +511,7 @@ export function TokenPage({ token }: Props) {
             <div className="tpMetric3Row">
               <div className="tpMetric3Cell">
                 <span>Liquidity &amp; Pool</span>
-                <strong>—</strong>
+                <strong>{token.liquidityUsd > 0 ? money(token.liquidityUsd) : "—"}</strong>
                 <small className="tpMuted">Liquidity</small>
               </div>
               <div className="tpMetric3Cell">
@@ -452,14 +568,16 @@ export function TokenPage({ token }: Props) {
             <div className="tpSignalRow">
               <div className="tpSignalCell">
                 <span>Lifecycle State</span>
-                <div className="tpLifecycle hot">
-                  <i />HOT
+                <div className={`tpLifecycle ${token.lifecycle}`}>
+                  <i />{token.lifecycle.toUpperCase()}
                 </div>
                 <small>Full Tracking</small>
               </div>
               <div className="tpSignalCell">
                 <span>Risk Level</span>
-                <strong className="up">Low Risk</strong>
+                <strong className={token.riskLevel === "Low" ? "up" : token.riskLevel === "Medium" ? "" : "dn"}>
+                  {riskLevelLabel}
+                </strong>
               </div>
               <div className="tpSignalCell">
                 <span>Signal Strength</span>
@@ -469,8 +587,9 @@ export function TokenPage({ token }: Props) {
 
             <div className="tpOverviewDivider" />
 
-            <button type="button" className="tpTrackBtn">
-              <Star size={15} fill="currentColor" /> Track This Token
+            <button type="button" className="tpTrackBtn" onClick={toggleStar}>
+              <Star size={15} fill={starred ? "currentColor" : "none"} />
+              {starred ? "Tracking ✓" : "Track This Token"}
             </button>
           </aside>
       </div>
@@ -538,11 +657,15 @@ function SignalBars({ value }: { value: number }) {
   );
 }
 
-function StatChip({ label, value, trend }: { label: string; value: string; trend?: "up" | "down" }) {
+function StatChip({ label, value, trend, note }: { label: string; value: string; trend?: "up" | "down"; note?: string }) {
   return (
-    <div className="tpStatChip">
+    <div className="tpStatChip" title={note}>
       <span className="tpStatLabel">{label}</span>
-      <span className="tpStatVal">{value}{trend && <em className={trend === "up" ? "up" : "dn"}>{trend === "up" ? " ↑" : " ↓"}</em>}</span>
+      <span className="tpStatVal">
+        {value}
+        {trend && <em className={trend === "up" ? "up" : "dn"}>{trend === "up" ? " ↑" : " ↓"}</em>}
+        {note && value === "—" && <em className="tpMuted" style={{ fontSize: 9, marginLeft: 3 }}>?</em>}
+      </span>
     </div>
   );
 }
