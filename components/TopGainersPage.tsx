@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  AlertCircle,
   ArrowRight,
   BarChart2,
   Bell,
@@ -14,7 +13,6 @@ import {
   Flame,
   Gem,
   Hexagon,
-  Info,
   KeyRound,
   Layers,
   Lock,
@@ -26,9 +24,10 @@ import {
   Star,
   TrendingUp,
   Wallet,
+  X,
   Zap,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import "../app/top-gainers/top-gainers.css";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -41,6 +40,8 @@ interface TokenSummary {
   name: string;
   priceUsd: number;
   priceChange24h: number;
+  priceChange1h?: number;
+  priceChange5m?: number;
   volume24hUsd: number;
   liquidityUsd: number;
   marketCapUsd: number;
@@ -71,14 +72,72 @@ function chainTone(chain: string): string {
   return map[chain] ?? "cyan";
 }
 
-function summaryToGainer(t: TokenSummary, rank: number): GainerRow {
-  const up = t.priceChange24h >= 0;
+// ─────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────
+type Timeframe = "5M" | "15M" | "1H" | "6H" | "24H" | "7D";
+type Chain = "All Chains" | "Base" | "Ethereum" | "BSC";
+
+// Maps UI chain label → API key (only supported chains)
+const CHAIN_API_KEY: Partial<Record<Chain, string>> = {
+  "Base": "base",
+  "Ethereum": "eth",
+  "BSC": "bsc",
+};
+
+function getPctChange(t: TokenSummary, tf: Timeframe): number {
+  if (tf === "5M" || tf === "15M") return t.priceChange5m ?? t.priceChange24h;
+  if (tf === "1H")                  return t.priceChange1h  ?? t.priceChange24h;
+  return t.priceChange24h;
+}
+
+function pctLabel(tf: Timeframe): string {
+  if (tf === "5M")  return "5M %";
+  if (tf === "15M") return "15M %";
+  if (tf === "1H")  return "1H %";
+  if (tf === "6H")  return "24H %";
+  if (tf === "7D")  return "24H %";
+  return "24H %";
+}
+
+interface GainerRow {
+  rank: number;
+  name: string;
+  pair: string;
+  price: string;
+  change: string;
+  volume24h: string;
+  liquidity: string;
+  mcap: string;
+  tone: string;
+  chain: "base" | "eth" | "bsc" | "sol";
+  address: string;
+  sparkPoints: string;
+}
+
+interface VolumeRow {
+  rank: number;
+  name: string;
+  pair: string;
+  price: string;
+  volume24h: string;
+  volumePct: number;
+  trades: string;
+  liquidity: string;
+  tone: string;
+  chain: "base" | "eth" | "bsc" | "sol";
+  address: string;
+}
+
+function summaryToGainer(t: TokenSummary, rank: number, tf: Timeframe): GainerRow {
+  const pct = getPctChange(t, tf);
+  const up = pct >= 0;
   return {
     rank,
     name: t.symbol,
     pair: `${t.symbol}/WETH`,
     price: fmtPrice(t.priceUsd),
-    change24h: `${up ? "+" : ""}${t.priceChange24h.toFixed(2)}%`,
+    change: `${up ? "+" : ""}${pct.toFixed(2)}%`,
     volume24h: fmtUsd(t.volume24hUsd),
     liquidity: fmtUsd(t.liquidityUsd),
     mcap: fmtUsd(t.marketCapUsd),
@@ -108,42 +167,6 @@ function summaryToVolume(t: TokenSummary, rank: number, totalVol: number): Volum
 }
 
 // ─────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────
-type Timeframe = "5M" | "15M" | "1H" | "6H" | "24H" | "7D";
-type Chain = "All Chains" | "Base" | "Ethereum" | "BSC" | "Solana" | "Arbitrum" | "Polygon" | "Avalanche" | "Optimism";
-
-interface GainerRow {
-  rank: number;
-  name: string;
-  pair: string;
-  price: string;
-  change24h: string;
-  volume24h: string;
-  liquidity: string;
-  mcap: string;
-  tone: string;
-  chain: "base" | "eth" | "bsc" | "sol";
-  address: string;
-  sparkPoints: string;
-}
-
-interface VolumeRow {
-  rank: number;
-  name: string;
-  pair: string;
-  price: string;
-  volume24h: string;
-  volumePct: number;
-  trades: string;
-  liquidity: string;
-  tone: string;
-  chain: "base" | "eth" | "bsc" | "sol";
-  address: string;
-}
-
-
-// ─────────────────────────────────────────────────────────────
 // Navigation config
 // ─────────────────────────────────────────────────────────────
 const navSections = [
@@ -164,7 +187,7 @@ const navSections = [
       { label: "Wallet Explorer", icon: Wallet,           route: "/wallet-explorer" },
       { label: "Holder Analysis", icon: Crosshair,        route: "/holder-analysis" },
       { label: "Risk Scanner",    icon: Shield,           route: "/risk-scanner" },
-      { label: "Top Gainers",     icon: TrendingUp,       route: "/top-gainers",  active: true },
+      { label: "Top Gainers",     icon: TrendingUp,       route: "/top-gainers", active: true },
       { label: "Top Volume",      icon: CircleDollarSign, route: "/top-volume" },
     ],
   },
@@ -186,22 +209,18 @@ const navSections = [
   },
 ];
 
+// Only chains that actually exist in the indexer DB
 const chainTabs: { label: Chain; dotClass?: string }[] = [
   { label: "All Chains" },
   { label: "Base",      dotClass: "blue" },
   { label: "Ethereum",  dotClass: "purple" },
   { label: "BSC",       dotClass: "yellow" },
-  { label: "Solana",    dotClass: "green" },
-  { label: "Arbitrum",  dotClass: "blue" },
-  { label: "Polygon",   dotClass: "purple" },
-  { label: "Avalanche", dotClass: "red" },
-  { label: "Optimism",  dotClass: "red" },
 ];
 
 // ─────────────────────────────────────────────────────────────
 // Helper components
 // ─────────────────────────────────────────────────────────────
-function TokenLogo({ label, tone }: { label: string; tone: string }) {
+function TokenLogo({ tone }: { tone: string }) {
   return (
     <span className={`tgTokenLogo ${tone}`}>
       <Hexagon size={14} />
@@ -311,29 +330,36 @@ function TgSidebar() {
 // ─────────────────────────────────────────────────────────────
 // Top Gainers Table
 // ─────────────────────────────────────────────────────────────
+const GAINER_PREVIEW = 10;
+
 function TopGainersTable({
   rows,
   starred,
   onToggleStar,
   loading,
+  timeframe,
 }: {
   rows: GainerRow[];
   starred: Set<string>;
   onToggleStar: (key: string) => void;
   loading: boolean;
+  timeframe: Timeframe;
 }) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
+  const displayed = expanded ? rows : rows.slice(0, GAINER_PREVIEW);
+
   return (
     <div className="tgTablePanel">
       <div className="tgTableHead">
         <div className="tgTableHeadLeft">
           <TrendingUp size={14} style={{ color: "var(--green)" }} />
           <span className="tgTableTitle">Top Gainers</span>
-          <span className="tgInfoIcon" title="Tokens ranked by 24h price change">i</span>
+          <span className="tgInfoIcon" title={`Tokens ranked by ${pctLabel(timeframe)} price change`}>i</span>
         </div>
-        <button className="tgDropdownBtn" type="button">
-          24h <ChevronDown size={12} />
-        </button>
+        <span className="tgDropdownBtn" style={{ cursor: "default" }}>
+          {pctLabel(timeframe)}
+        </span>
       </div>
 
       <div className="tgTableWrap">
@@ -344,7 +370,7 @@ function TopGainersTable({
               <th></th>
               <th>Token</th>
               <th>Price</th>
-              <th>24H %</th>
+              <th>{pctLabel(timeframe)}</th>
               <th>Volume (24H)</th>
               <th>Liquidity</th>
               <th>MCap</th>
@@ -356,9 +382,9 @@ function TopGainersTable({
               <tr><td colSpan={9} style={{ textAlign: "center", color: "var(--faint)", padding: "24px 0" }}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={9} style={{ textAlign: "center", color: "var(--faint)", padding: "24px 0" }}>No data yet — run indexer</td></tr>
-            ) : rows.map((row) => {
+            ) : displayed.map((row) => {
               const key = `g-${row.rank}`;
-              const isPos = row.change24h.startsWith("+");
+              const isPos = row.change.startsWith("+");
               return (
                 <tr key={row.rank} onClick={() => router.push(`/token/${row.chain}/${row.address}`)}>
                   <td><span className="tgRank">{row.rank}</span></td>
@@ -374,16 +400,18 @@ function TopGainersTable({
                   </td>
                   <td>
                     <div className="tgTokenCell">
-                      <TokenLogo label={row.name} tone={row.tone} />
+                      <TokenLogo tone={row.tone} />
                       <div className="tgTokenInfo">
                         <span className="tgTokenName">{row.name}</span>
                         <span className="tgTokenPair">{row.pair}</span>
                       </div>
-                      <span className={`tgChainBadge ${row.chain}`}>{row.chain === "base" ? "Base" : row.chain === "eth" ? "ETH" : row.chain === "bsc" ? "BSC" : "SOL"}</span>
+                      <span className={`tgChainBadge ${row.chain}`}>
+                        {row.chain === "base" ? "Base" : row.chain === "eth" ? "ETH" : row.chain === "bsc" ? "BSC" : "SOL"}
+                      </span>
                     </div>
                   </td>
                   <td><span className="tgPrice">{row.price}</span></td>
-                  <td><span className={isPos ? "tgChangePos" : "tgChangeNeg"}>{row.change24h}</span></td>
+                  <td><span className={isPos ? "tgChangePos" : "tgChangeNeg"}>{row.change}</span></td>
                   <td><span className="tgVolume">{row.volume24h}</span></td>
                   <td><span className="tgLiq">{row.liquidity}</span></td>
                   <td><span className="tgMcap">{row.mcap}</span></td>
@@ -395,9 +423,11 @@ function TopGainersTable({
         </table>
       </div>
 
-      <button className="tgViewAllBtn" type="button">
-        View All Gainers <ArrowRight size={13} />
-      </button>
+      {rows.length > GAINER_PREVIEW && (
+        <button className="tgViewAllBtn" type="button" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Collapse" : `View All Gainers (${rows.length})`} <ArrowRight size={13} />
+        </button>
+      )}
     </div>
   );
 }
@@ -405,6 +435,8 @@ function TopGainersTable({
 // ─────────────────────────────────────────────────────────────
 // Top Volume Table
 // ─────────────────────────────────────────────────────────────
+const VOLUME_PREVIEW = 10;
+
 function TopVolumeTable({
   rows,
   starred,
@@ -417,6 +449,9 @@ function TopVolumeTable({
   loading: boolean;
 }) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
+  const displayed = expanded ? rows : rows.slice(0, VOLUME_PREVIEW);
+
   return (
     <div className="tgTablePanel">
       <div className="tgTableHead">
@@ -425,9 +460,7 @@ function TopVolumeTable({
           <span className="tgTableTitle">Top Volume</span>
           <span className="tgInfoIcon" title="Tokens ranked by 24h trading volume">i</span>
         </div>
-        <button className="tgDropdownBtn" type="button">
-          24h <ChevronDown size={12} />
-        </button>
+        <span className="tgDropdownBtn" style={{ cursor: "default" }}>24H Vol</span>
       </div>
 
       <div className="tgTableWrap">
@@ -449,7 +482,7 @@ function TopVolumeTable({
               <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--faint)", padding: "24px 0" }}>Loading…</td></tr>
             ) : rows.length === 0 ? (
               <tr><td colSpan={8} style={{ textAlign: "center", color: "var(--faint)", padding: "24px 0" }}>No data yet — run indexer</td></tr>
-            ) : rows.map((row) => {
+            ) : displayed.map((row) => {
               const key = `v-${row.rank}`;
               return (
                 <tr key={row.rank} onClick={() => router.push(`/token/${row.chain}/${row.address}`)}>
@@ -466,12 +499,14 @@ function TopVolumeTable({
                   </td>
                   <td>
                     <div className="tgTokenCell">
-                      <TokenLogo label={row.name} tone={row.tone} />
+                      <TokenLogo tone={row.tone} />
                       <div className="tgTokenInfo">
                         <span className="tgTokenName">{row.name}</span>
                         <span className="tgTokenPair">{row.pair}</span>
                       </div>
-                      <span className={`tgChainBadge ${row.chain}`}>{row.chain === "base" ? "Base" : row.chain === "eth" ? "ETH" : row.chain === "bsc" ? "BSC" : "SOL"}</span>
+                      <span className={`tgChainBadge ${row.chain}`}>
+                        {row.chain === "base" ? "Base" : row.chain === "eth" ? "ETH" : row.chain === "bsc" ? "BSC" : "SOL"}
+                      </span>
                     </div>
                   </td>
                   <td><span className="tgPrice">{row.price}</span></td>
@@ -493,9 +528,11 @@ function TopVolumeTable({
         </table>
       </div>
 
-      <button className="tgViewAllBtn" type="button">
-        View All Volume <ArrowRight size={13} />
-      </button>
+      {rows.length > VOLUME_PREVIEW && (
+        <button className="tgViewAllBtn" type="button" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Collapse" : `View All Volume (${rows.length})`} <ArrowRight size={13} />
+        </button>
+      )}
     </div>
   );
 }
@@ -511,7 +548,6 @@ function QuickInsights({ gainers, volumeTokens }: { gainers: TokenSummary[]; vol
   const mostActive = [...volumeTokens].sort((a, b) => (b.buys + b.sells) - (a.buys + a.sells))[0];
   const topGainerBy1h = [...gainers].sort((a, b) => (b.priceChange24h ?? 0) - (a.priceChange24h ?? 0))[0];
 
-  // Hot chain by volume
   const volByChain = volumeTokens.reduce<Record<string, number>>((acc, t) => {
     acc[t.chain] = (acc[t.chain] ?? 0) + t.volume24hUsd;
     return acc;
@@ -519,7 +555,11 @@ function QuickInsights({ gainers, volumeTokens }: { gainers: TokenSummary[]; vol
   const hotChain = Object.entries(volByChain).sort((a, b) => b[1] - a[1])[0];
   const totalVol = Object.values(volByChain).reduce((s, v) => s + v, 0);
 
-  type InsightCard = { label: string; logo: string; logoTone: string; value: string; valueTone: string; sub: string; meta: string; sparkPoints: string; sparkTone: string };
+  type InsightCard = {
+    label: string; logo: string; logoTone: string;
+    value: string; valueTone: string; sub: string; meta: string;
+    sparkPoints: string; sparkTone: string;
+  };
   const cards = ([
     topGainer ? {
       label: "Biggest Gainer",
@@ -607,6 +647,51 @@ function QuickInsights({ gainers, volumeTokens }: { gainers: TokenSummary[]; vol
 }
 
 // ─────────────────────────────────────────────────────────────
+// SVG Donut chart (real proportions from live data)
+// ─────────────────────────────────────────────────────────────
+const DONUT_CHAIN_COLORS: Record<string, string> = {
+  base:  "oklch(0.65 0.2 240)",
+  eth:   "oklch(0.65 0.18 290)",
+  bsc:   "oklch(0.75 0.18 85)",
+};
+const DONUT_FALLBACK = "oklch(0.5 0.05 255)";
+
+function DonutChart({ data }: { data: { chain: string; vol: number; pct: number }[] }) {
+  const r = 30;
+  const cx = 40;
+  const cy = 40;
+  const circumference = 2 * Math.PI * r;
+
+  let offset = 0;
+  const segments = data.map((d) => {
+    const dash = (d.pct / 100) * circumference;
+    const gap  = circumference - dash;
+    const seg = { ...d, dash, gap, offset };
+    offset += dash;
+    return seg;
+  });
+
+  return (
+    <svg viewBox="0 0 80 80" width="80" height="80" aria-label="Volume by chain donut chart">
+      <circle cx={cx} cy={cy} r={r} fill="none"
+        stroke="oklch(0.22 0.04 255 / 0.4)" strokeWidth="10" />
+      {segments.map((seg) => (
+        <circle
+          key={seg.chain}
+          cx={cx} cy={cy} r={r}
+          fill="none"
+          stroke={DONUT_CHAIN_COLORS[seg.chain] ?? DONUT_FALLBACK}
+          strokeWidth="10"
+          strokeDasharray={`${seg.dash} ${seg.gap}`}
+          strokeDashoffset={-seg.offset + circumference / 4}
+          style={{ transition: "stroke-dasharray 0.4s ease" }}
+        />
+      ))}
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Right Panel — computed from real data
 // ─────────────────────────────────────────────────────────────
 function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volumeTokens: TokenSummary[] }) {
@@ -618,14 +703,17 @@ function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volume
   const winPct      = all.length > 0 ? Math.round((winners / all.length) * 100) : 50;
   const chainSet    = new Set(all.map(t => t.chain));
 
-  // Volume by chain
   const volByChain = all.reduce<Record<string, number>>((acc, t) => {
     acc[t.chain] = (acc[t.chain] ?? 0) + t.volume24hUsd;
     return acc;
   }, {});
   const chainVolList = Object.entries(volByChain).sort((a, b) => b[1] - a[1]);
+  const donutData = chainVolList.map(([chain, vol]) => ({
+    chain,
+    vol,
+    pct: totalVolume > 0 ? (vol / totalVolume) * 100 : 0,
+  }));
 
-  // Recently active: highest swap count
   const recentlyActive = [...all]
     .sort((a, b) => (b.buys + b.sells) - (a.buys + a.sells))
     .slice(0, 5);
@@ -642,10 +730,10 @@ function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volume
         </div>
         <div className="tgStatList">
           {[
-            { label: "Tokens Tracked",  value: all.length > 0 ? all.length.toLocaleString() : "—", change: null },
-            { label: "Total Volume",    value: totalVolume > 0 ? fmtUsd(totalVolume) : "—", change: null },
-            { label: "Total Market Cap",value: totalMcap > 0 ? fmtUsd(totalMcap) : "—", change: null },
-            { label: "Active Chains",   value: chainSet.size > 0 ? String(chainSet.size) : "—", change: null },
+            { label: "Tokens Tracked",   value: all.length > 0 ? all.length.toLocaleString() : "—" },
+            { label: "Total Volume",     value: totalVolume > 0 ? fmtUsd(totalVolume) : "—" },
+            { label: "Total Market Cap", value: totalMcap > 0 ? fmtUsd(totalMcap) : "—" },
+            { label: "Active Chains",    value: chainSet.size > 0 ? String(chainSet.size) : "—" },
           ].map((stat) => (
             <div className="tgStatRow" key={stat.label}>
               <span className="tgStatLabel">{stat.label}</span>
@@ -666,13 +754,21 @@ function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volume
           </span>
         </div>
         <div className="tgDonutWrap">
-          <div className="tgDonut" aria-label="Volume by chain donut chart" />
+          {donutData.length > 0 ? (
+            <DonutChart data={donutData} />
+          ) : (
+            <div className="tgDonut" aria-label="No data" />
+          )}
           <div className="tgDonutLegend">
             {chainVolList.map(([chain, vol]) => (
               <div className="tgDonutLegendRow" key={chain}>
                 <span className={`tgDonutDot ${chain}`} />
-                <span className="tgDonutLegendLabel">{chain === "eth" ? "Ethereum" : chain.toUpperCase()}</span>
-                <span className="tgDonutLegendPct">{totalVolume > 0 ? `${((vol / totalVolume) * 100).toFixed(1)}%` : "—"}</span>
+                <span className="tgDonutLegendLabel">
+                  {chain === "eth" ? "Ethereum" : chain.toUpperCase()}
+                </span>
+                <span className="tgDonutLegendPct">
+                  {totalVolume > 0 ? `${((vol / totalVolume) * 100).toFixed(1)}%` : "—"}
+                </span>
               </div>
             ))}
           </div>
@@ -688,8 +784,8 @@ function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volume
           </span>
         </div>
         <div className="tgWLLabels">
-          <span className="tgWLLabelW">Winners</span>
-          <span className="tgWLLabelL">Losers</span>
+          <span className="tgWLLabelW">Winners ({winners})</span>
+          <span className="tgWLLabelL">Losers ({losers})</span>
         </div>
         <div className="tgWLRow">
           <span className="tgWLWinners">{winPct}%</span>
@@ -700,7 +796,7 @@ function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volume
         </div>
       </section>
 
-      {/* ── Recently Active ──────────────────────────────────── */}
+      {/* ── Most Active ──────────────────────────────────────── */}
       <section>
         <div className="tgRpSectionHead">
           <span className="tgRpSectionTitle">
@@ -733,6 +829,112 @@ function RightPanel({ gainers, volumeTokens }: { gainers: TokenSummary[]; volume
 }
 
 // ─────────────────────────────────────────────────────────────
+// Customize Filter Panel
+// ─────────────────────────────────────────────────────────────
+function CustomizePanel({
+  minVolume,
+  setMinVolume,
+  minMcap,
+  setMinMcap,
+  minChange,
+  setMinChange,
+  onClose,
+}: {
+  minVolume: number;
+  setMinVolume: (v: number) => void;
+  minMcap: number;
+  setMinMcap: (v: number) => void;
+  minChange: number;
+  setMinChange: (v: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div style={{
+      background: "oklch(0.14 0.04 255)",
+      border: "1px solid oklch(0.28 0.06 255 / 0.5)",
+      borderRadius: 10,
+      padding: "14px 16px",
+      marginBottom: 12,
+      display: "flex",
+      gap: 20,
+      flexWrap: "wrap",
+      alignItems: "flex-end",
+    }}>
+      <div style={{ flex: 1, minWidth: 140 }}>
+        <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 4 }}>
+          Min 24H Volume
+        </label>
+        <select
+          value={minVolume}
+          onChange={(e) => setMinVolume(Number(e.target.value))}
+          style={{
+            width: "100%", background: "oklch(0.18 0.04 255)", border: "1px solid oklch(0.3 0.05 255)",
+            borderRadius: 6, color: "var(--text)", fontSize: 12, padding: "4px 8px",
+          }}
+        >
+          <option value={0}>Any</option>
+          <option value={1_000}>$1K+</option>
+          <option value={10_000}>$10K+</option>
+          <option value={50_000}>$50K+</option>
+          <option value={100_000}>$100K+</option>
+          <option value={500_000}>$500K+</option>
+        </select>
+      </div>
+      <div style={{ flex: 1, minWidth: 140 }}>
+        <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 4 }}>
+          Min Market Cap
+        </label>
+        <select
+          value={minMcap}
+          onChange={(e) => setMinMcap(Number(e.target.value))}
+          style={{
+            width: "100%", background: "oklch(0.18 0.04 255)", border: "1px solid oklch(0.3 0.05 255)",
+            borderRadius: 6, color: "var(--text)", fontSize: 12, padding: "4px 8px",
+          }}
+        >
+          <option value={0}>Any</option>
+          <option value={10_000}>$10K+</option>
+          <option value={100_000}>$100K+</option>
+          <option value={500_000}>$500K+</option>
+          <option value={1_000_000}>$1M+</option>
+          <option value={10_000_000}>$10M+</option>
+        </select>
+      </div>
+      <div style={{ flex: 1, minWidth: 140 }}>
+        <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 4 }}>
+          Min % Change
+        </label>
+        <select
+          value={minChange}
+          onChange={(e) => setMinChange(Number(e.target.value))}
+          style={{
+            width: "100%", background: "oklch(0.18 0.04 255)", border: "1px solid oklch(0.3 0.05 255)",
+            borderRadius: 6, color: "var(--text)", fontSize: 12, padding: "4px 8px",
+          }}
+        >
+          <option value={-Infinity}>Any</option>
+          <option value={0}>Positive only</option>
+          <option value={5}>+5%+</option>
+          <option value={10}>+10%+</option>
+          <option value={20}>+20%+</option>
+          <option value={50}>+50%+</option>
+        </select>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        style={{
+          background: "none", border: "1px solid oklch(0.3 0.05 255)", borderRadius: 6,
+          color: "var(--muted)", cursor: "pointer", padding: "4px 10px", fontSize: 12,
+        }}
+      >
+        <X size={12} /> Close
+      </button>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Main Page Component
 // ─────────────────────────────────────────────────────────────
 export function TopGainersPage() {
@@ -742,12 +944,18 @@ export function TopGainersPage() {
   const [gainers, setGainers] = useState<TokenSummary[]>([]);
   const [volumeTokens, setVolumeTokens] = useState<TokenSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [minVolume, setMinVolume] = useState(0);
+  const [minMcap, setMinMcap] = useState(0);
+  const [minChange, setMinChange] = useState(-Infinity);
 
   const timeframes: Timeframe[] = ["5M", "15M", "1H", "6H", "24H", "7D"];
 
+  // Re-fetch only when chain changes — timeframe sort is client-side
   useEffect(() => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-    const chainParam = activeChain !== "All Chains" ? `&chain=${activeChain.toLowerCase()}` : "";
+    const apiKey = CHAIN_API_KEY[activeChain];
+    const chainParam = apiKey ? `&chain=${apiKey}` : "";
     setLoading(true);
     Promise.all([
       fetch(`${api}/api/market/tokens?sort=gainers${chainParam}`).then(r => r.json()).then(d => setGainers(d.data ?? [])),
@@ -755,18 +963,38 @@ export function TopGainersPage() {
     ]).catch(() => {}).finally(() => setLoading(false));
   }, [activeChain]);
 
+  // Client-side sort gainers by selected timeframe
+  const sortedGainers = useMemo(() => {
+    return [...gainers].sort((a, b) => getPctChange(b, timeframe) - getPctChange(a, timeframe));
+  }, [gainers, timeframe]);
+
+  // Apply customize filters
+  const filteredGainers = useMemo(() => {
+    return sortedGainers.filter(t =>
+      t.volume24hUsd >= minVolume &&
+      t.marketCapUsd >= (minMcap === 0 ? 0 : minMcap) &&
+      getPctChange(t, timeframe) >= (minChange === -Infinity ? -Infinity : minChange)
+    );
+  }, [sortedGainers, minVolume, minMcap, minChange, timeframe]);
+
+  const filteredVolume = useMemo(() => {
+    return volumeTokens.filter(t =>
+      t.volume24hUsd >= minVolume &&
+      t.marketCapUsd >= (minMcap === 0 ? 0 : minMcap)
+    );
+  }, [volumeTokens, minVolume, minMcap]);
+
   function toggleStar(key: string) {
     setStarred((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }
 
-  const totalVol = volumeTokens.reduce((s, t) => s + t.volume24hUsd, 0);
-  const gainerRows = gainers.map((t, i) => summaryToGainer(t, i + 1));
-  const volumeRows = volumeTokens.map((t, i) => summaryToVolume(t, i + 1, totalVol));
+  const totalVol = filteredVolume.reduce((s, t) => s + t.volume24hUsd, 0);
+  const gainerRows = filteredGainers.map((t, i) => summaryToGainer(t, i + 1, timeframe));
+  const volumeRows = filteredVolume.map((t, i) => summaryToVolume(t, i + 1, totalVol));
 
   return (
     <div className="appShell" style={{ minHeight: "100vh" }}>
@@ -799,11 +1027,25 @@ export function TopGainersPage() {
                   </button>
                 ))}
               </div>
-              <button className="tgCustomizeBtn" type="button">
+              <button
+                className={`tgCustomizeBtn ${showCustomize ? "active" : ""}`}
+                type="button"
+                onClick={() => setShowCustomize((v) => !v)}
+              >
                 <Sliders size={14} /> Customize
               </button>
             </div>
           </div>
+
+          {/* Customize filter panel */}
+          {showCustomize && (
+            <CustomizePanel
+              minVolume={minVolume} setMinVolume={setMinVolume}
+              minMcap={minMcap} setMinMcap={setMinMcap}
+              minChange={minChange} setMinChange={setMinChange}
+              onClose={() => setShowCustomize(false)}
+            />
+          )}
 
           {/* Chain filter tabs */}
           <div className="tgChainTabBar" role="tablist" aria-label="Filter by chain">
@@ -822,19 +1064,27 @@ export function TopGainersPage() {
                 {tab.label}
               </button>
             ))}
-            <button className="tgChainTab" type="button" style={{ color: "var(--muted)" }}>
-              More ▾
-            </button>
           </div>
 
           {/* Two-column tables */}
           <div className="tgTablesRow">
-            <TopGainersTable rows={gainerRows} starred={starred} onToggleStar={toggleStar} loading={loading} />
-            <TopVolumeTable  rows={volumeRows} starred={starred} onToggleStar={toggleStar} loading={loading} />
+            <TopGainersTable
+              rows={gainerRows}
+              starred={starred}
+              onToggleStar={toggleStar}
+              loading={loading}
+              timeframe={timeframe}
+            />
+            <TopVolumeTable
+              rows={volumeRows}
+              starred={starred}
+              onToggleStar={toggleStar}
+              loading={loading}
+            />
           </div>
 
           {/* Quick Insights */}
-          <QuickInsights gainers={gainers} volumeTokens={volumeTokens} />
+          <QuickInsights gainers={sortedGainers} volumeTokens={volumeTokens} />
         </main>
 
         {/* Right panel */}

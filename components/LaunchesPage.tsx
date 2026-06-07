@@ -167,38 +167,38 @@ const NAV_SECTIONS = [
   {
     title: "",
     items: [
-      { label: "Radar",        icon: Radar,           route: "/" },
-      { label: "Launches",     icon: Activity,        route: "/launches",     active: true },
-      { label: "Watchlist",    icon: Star },
-      { label: "Opportunities",icon: Gem },
-      { label: "Alerts",       icon: Bell },
+      { label: "Radar",         icon: Radar,            route: "/"             },
+      { label: "Launches",      icon: Activity,         route: "/launches",      active: true },
+      { label: "Watchlist",     icon: Star,             route: "/watchlist"    },
+      { label: "Opportunities", icon: Gem,              route: "/opportunities" },
+      { label: "Alerts",        icon: Bell,             route: "/alerts"       },
     ],
   },
   {
     title: "Intelligence",
     items: [
-      { label: "Smart Money",    icon: Zap,       route: "/smart-money" },
-      { label: "Wallet Explorer",icon: Wallet },
-      { label: "Holder Analysis",icon: Crosshair },
-      { label: "Risk Scanner",   icon: Shield },
+      { label: "Smart Money",     icon: Zap,       route: "/smart-money"     },
+      { label: "Wallet Explorer", icon: Wallet,    route: "/wallet-explorer" },
+      { label: "Holder Analysis", icon: Crosshair, route: "/holder-analysis" },
+      { label: "Risk Scanner",    icon: Shield,    route: "/risk-scanner"    },
     ],
   },
   {
     title: "Tools",
     items: [
-      { label: "DEX Pools",         icon: Layers },
-      { label: "Liquidity Locks",   icon: Lock },
-      { label: "Contract Analyzer", icon: Database },
-      { label: "Top Gainers",       icon: TrendingUp },
-      { label: "Top Volume",        icon: CircleDollarSign },
+      { label: "DEX Pools",         icon: Layers,          route: "/dex-pools"          },
+      { label: "Liquidity Locks",   icon: Lock,            route: "/liquidity-locks"    },
+      { label: "Contract Analyzer", icon: Database,        route: "/contract-analyzer"  },
+      { label: "Top Gainers",       icon: TrendingUp,      route: "/top-gainers"        },
+      { label: "Top Volume",        icon: CircleDollarSign,route: "/top-volume"         },
     ],
   },
   {
     title: "Settings",
     items: [
-      { label: "Settings",      icon: Settings },
-      { label: "API Access",    icon: KeyRound },
-      { label: "Documentation", icon: BookOpen },
+      { label: "Settings",      icon: Settings, route: "/settings"   },
+      { label: "API Access",    icon: KeyRound, route: "/api-access"  },
+      { label: "Documentation", icon: BookOpen, route: "/docs"        },
     ],
   },
 ];
@@ -539,19 +539,21 @@ function TabBar({
    Token table
 ══════════════════════════════════════════════════════════ */
 
+const ALL_COLUMNS = ["Platform", "Launched", "Age", "Market Cap", "Volume", "Liquidity", "Smart Score"] as const;
+type ColumnKey = typeof ALL_COLUMNS[number];
+
 function TokenTable({
-  tokens, onRowClick, starred, onToggleStar, onChartClick,
+  tokens, onRowClick, starred, onToggleStar, onChartClick, hiddenCols,
 }: {
   tokens: TokenLaunch[];
   onRowClick: (token: TokenLaunch) => void;
   starred: Record<string, boolean>;
   onToggleStar: (id: string) => void;
   onChartClick: (token: TokenLaunch) => void;
+  hiddenCols: Set<ColumnKey>;
 }) {
-  const toggleStar = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    onToggleStar(id);
-  };
+  const show = (col: ColumnKey) => !hiddenCols.has(col);
+  const toggleStar = (e: React.MouseEvent, id: string) => { e.stopPropagation(); onToggleStar(id); };
 
   return (
     <div className="lpTableWrap">
@@ -561,13 +563,13 @@ function TokenTable({
             <th>☆</th>
             <th>Token / Pair</th>
             <th>Chain</th>
-            <th>Platform</th>
-            <th>Launched</th>
-            <th>Age</th>
-            <th>Market Cap</th>
-            <th>Volume (24H)</th>
-            <th>Liquidity</th>
-            <th>Smart Score</th>
+            {show("Platform")    && <th>Platform</th>}
+            {show("Launched")    && <th>Launched</th>}
+            {show("Age")         && <th>Age</th>}
+            {show("Market Cap")  && <th>Market Cap</th>}
+            {show("Volume")      && <th>Volume (24H)</th>}
+            {show("Liquidity")   && <th>Liquidity</th>}
+            {show("Smart Score") && <th>Smart Score</th>}
             <th>Risk</th>
             <th>Actions</th>
           </tr>
@@ -575,7 +577,6 @@ function TokenTable({
         <tbody>
           {tokens.map((token) => (
             <tr key={token.id} onClick={() => onRowClick(token)}>
-              {/* Star */}
               <td>
                 <button
                   className={`lpStarBtn ${starred[token.id] ? "lpStarred" : ""}`}
@@ -586,8 +587,6 @@ function TokenTable({
                   <Star size={13} fill={starred[token.id] ? "currentColor" : "none"} />
                 </button>
               </td>
-
-              {/* Token/Pair */}
               <td>
                 <div className="lpTokenCell">
                   <span className={`lpTokenLogo ${token.logoPalette}`}>
@@ -599,62 +598,35 @@ function TokenTable({
                   </span>
                 </div>
               </td>
-
-              {/* Chain */}
               <td>
                 <span className={`lpChainBadge ${token.chain}`}>
                   {token.chain === "eth" ? "ETH" : token.chain.toUpperCase()}
                 </span>
               </td>
-
-              {/* Platform */}
-              <td>
-                <PlatformBadge platform={token.launchPlatform} />
-              </td>
-
-              {/* Launched */}
-              <td style={{ color: "var(--muted)", fontSize: 11 }}>{token.launchedAt}</td>
-
-              {/* Age */}
-              <td style={{ color: "var(--faint)", fontSize: 11 }}>{token.age}</td>
-
-              {/* Market cap */}
-              <td style={{ color: "var(--text)", fontWeight: 700 }}>{token.marketCap}</td>
-
-              {/* Volume */}
-              <td style={{ color: "var(--text)" }}>{token.volume24h}</td>
-
-              {/* Liquidity */}
-              <td>
-                <div className="lpLiqCell">
-                  {token.liquidity}
-                  {token.liquidityLocked ? (
-                    <Lock size={12} className="lpLockIcon" aria-label="Liquidity locked" />
-                  ) : (
-                    <AlertTriangle size={12} className="lpWarnIcon" aria-label="Liquidity unlocked" />
-                  )}
-                </div>
-              </td>
-
-              {/* Smart Score */}
-              <td>
-                <div className="lpScoreCell">
-                  <SmartScoreGauge score={token.smartScore} />
-                </div>
-              </td>
-
-              {/* Risk */}
-              <td>
-                <RiskBadge level={token.risk} />
-              </td>
-
-              {/* Actions */}
+              {show("Platform")    && <td><PlatformBadge platform={token.launchPlatform} /></td>}
+              {show("Launched")    && <td style={{ color: "var(--muted)", fontSize: 11 }}>{token.launchedAt}</td>}
+              {show("Age")         && <td style={{ color: "var(--faint)", fontSize: 11 }}>{token.age}</td>}
+              {show("Market Cap")  && <td style={{ color: "var(--text)", fontWeight: 700 }}>{token.marketCap}</td>}
+              {show("Volume")      && <td style={{ color: "var(--text)" }}>{token.volume24h}</td>}
+              {show("Liquidity")   && (
+                <td>
+                  <div className="lpLiqCell">
+                    {token.liquidity}
+                    {token.liquidityLocked
+                      ? <Lock size={12} className="lpLockIcon" aria-label="Liquidity locked" />
+                      : <AlertTriangle size={12} className="lpWarnIcon" aria-label="Liquidity unlocked" />}
+                  </div>
+                </td>
+              )}
+              {show("Smart Score") && (
+                <td><div className="lpScoreCell"><SmartScoreGauge score={token.smartScore} /></div></td>
+              )}
+              <td><RiskBadge level={token.risk} /></td>
               <td>
                 <div className="lpActions" onClick={(e) => e.stopPropagation()}>
                   <button
                     className={`lpActionBtn ${starred[token.id] ? "lpStarred" : ""}`}
-                    type="button"
-                    aria-label="Favourite"
+                    type="button" aria-label="Favourite"
                     onClick={(e) => toggleStar(e, token.id)}
                   >
                     <Star size={12} fill={starred[token.id] ? "currentColor" : "none"} />
@@ -662,8 +634,7 @@ function TokenTable({
                   <a
                     className="lpActionBtn"
                     href={explorerUrl(token.chain, token.address)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    target="_blank" rel="noopener noreferrer"
                     aria-label="View on explorer"
                     style={{ display: "grid", placeItems: "center" }}
                     onClick={(e) => e.stopPropagation()}
@@ -825,6 +796,7 @@ function PlatformSection({ platformKey, tokens, onTokenClick }: PlatformSectionP
 ══════════════════════════════════════════════════════════ */
 
 function HotAlertsBand({ rawTokens }: { rawTokens: TokenSummary[] }) {
+  const router = useRouter();
   if (rawTokens.length === 0) return null;
 
   // Newest 2 by lastActivityAt, highest volume, highest gainer
@@ -885,7 +857,7 @@ function HotAlertsBand({ rawTokens }: { rawTokens: TokenSummary[] }) {
           </div>
         ))}
       </div>
-      <button className="lpAlertViewAll" type="button">
+      <button className="lpAlertViewAll" type="button" onClick={() => router.push("/alerts")}>
         View all alerts <ArrowRight size={13} />
       </button>
     </div>
@@ -1004,8 +976,17 @@ const CHAIN_COLORS: Record<string, string> = {
   bsc:  "oklch(0.8 0.15 83)",
 };
 
+type TrendsTf = "1H" | "6H" | "24H" | "7D";
+const TRENDS_TF_OPTIONS: TrendsTf[] = ["1H", "6H", "24H", "7D"];
+const TRENDS_TF_MINS: Record<TrendsTf, number> = { "1H": 60, "6H": 360, "24H": 1440, "7D": 10_080 };
+
 function LaunchTrendsPanel({ rawTokens }: { rawTokens: TokenSummary[] }) {
-  const byChain = rawTokens.reduce<Record<string, { count: number; volume: number }>>((acc, t) => {
+  const [tf, setTf] = useState<TrendsTf>("24H");
+  const [tfOpen, setTfOpen] = useState(false);
+
+  const filtered = rawTokens.filter(t => t.ageMinutes <= TRENDS_TF_MINS[tf]);
+
+  const byChain = filtered.reduce<Record<string, { count: number; volume: number }>>((acc, t) => {
     const k = t.chain;
     if (!acc[k]) acc[k] = { count: 0, volume: 0 };
     acc[k].count++;
@@ -1019,7 +1000,7 @@ function LaunchTrendsPanel({ rawTokens }: { rawTokens: TokenSummary[] }) {
 
   const maxCount = chainList[0]?.[1].count ?? 1;
 
-  if (chainList.length === 0) {
+  if (rawTokens.length === 0) {
     return (
       <div className="lpTrendsPanel">
         <div className="lpPanelHead"><h3>Launch Trends</h3></div>
@@ -1032,30 +1013,50 @@ function LaunchTrendsPanel({ rawTokens }: { rawTokens: TokenSummary[] }) {
     <div className="lpTrendsPanel">
       <div className="lpPanelHead">
         <h3>Launch Trends</h3>
-        <button className="lpDropdownBtn" type="button">
-          24H <ChevronDown size={12} />
-        </button>
-      </div>
-      <div className="lpTrendsList">
-        {chainList.map(([chain, data]) => (
-          <div className="lpTrendRow" key={chain}>
-            <span className="lpTrendName">{chain === "eth" ? "Ethereum" : chain.toUpperCase()}</span>
-            <div style={{ position: "relative", height: 6, background: "oklch(0.34 0.028 255 / 0.3)", borderRadius: 3, overflow: "hidden" }}>
-              <div
-                className="lpTrendBar"
-                style={{
-                  background: CHAIN_COLORS[chain] ?? "oklch(0.6 0.15 255)",
-                  width: `${(data.count / maxCount) * 100}%`,
-                  height: "100%",
-                  borderRadius: 3,
-                }}
-              />
+        <div style={{ position: "relative" }}>
+          <button className="lpDropdownBtn" type="button" onClick={() => setTfOpen(o => !o)}>
+            {tf} <ChevronDown size={12} />
+          </button>
+          {tfOpen && (
+            <div className="radarDropdown" style={{ right: 0, left: "auto", minWidth: 80 }}
+              onMouseLeave={() => setTfOpen(false)}>
+              {TRENDS_TF_OPTIONS.map(opt => (
+                <button key={opt} type="button"
+                  className={`radarDropdownItem ${tf === opt ? "selected" : ""}`}
+                  onClick={() => { setTf(opt); setTfOpen(false); }}>
+                  {opt}
+                </button>
+              ))}
             </div>
-            <span className="lpTrendCount">{data.count}</span>
-            <span className="lpTrendPct positive">{fmtUsd(data.volume)}</span>
-          </div>
-        ))}
+          )}
+        </div>
       </div>
+      {chainList.length === 0 ? (
+        <div style={{ color: "var(--faint)", fontSize: 12, padding: "8px 0" }}>
+          No launches in the last {tf}
+        </div>
+      ) : (
+        <div className="lpTrendsList">
+          {chainList.map(([chain, data]) => (
+            <div className="lpTrendRow" key={chain}>
+              <span className="lpTrendName">{chain === "eth" ? "Ethereum" : chain.toUpperCase()}</span>
+              <div style={{ position: "relative", height: 6, background: "oklch(0.34 0.028 255 / 0.3)", borderRadius: 3, overflow: "hidden" }}>
+                <div
+                  className="lpTrendBar"
+                  style={{
+                    background: CHAIN_COLORS[chain] ?? "oklch(0.6 0.15 255)",
+                    width: `${(data.count / maxCount) * 100}%`,
+                    height: "100%",
+                    borderRadius: 3,
+                  }}
+                />
+              </div>
+              <span className="lpTrendCount">{data.count}</span>
+              <span className="lpTrendPct positive">{fmtUsd(data.volume)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1186,6 +1187,8 @@ export function LaunchesPage() {
   const [platformTokens, setPlatformTokens] = useState<Record<string, TokenSummary[]>>({});
   const [loading, setLoading] = useState(true);
   const [alertCount, setAlertCount] = useState(0);
+  const [showCustomize, setShowCustomize] = useState(false);
+  const [hiddenCols, setHiddenCols] = useState<Set<ColumnKey>>(new Set());
 
   // Starred — localStorage persistence
   const [starred, setStarred] = useState<Record<string, boolean>>({});
@@ -1313,11 +1316,62 @@ export function LaunchesPage() {
                   {tf}
                 </button>
               ))}
-              <button className="lpCustomizeBtn" type="button">
+              <button
+                className={`lpCustomizeBtn ${showCustomize ? "active" : ""}`}
+                type="button"
+                onClick={() => setShowCustomize(v => !v)}
+              >
                 <Settings size={13} /> Customize
               </button>
             </div>
           </div>
+
+          {/* Column visibility picker */}
+          {showCustomize && (
+            <div style={{
+              display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center",
+              padding: "10px 14px", marginBottom: 8,
+              background: "oklch(0.14 0.04 255)",
+              border: "1px solid oklch(0.28 0.06 255 / 0.5)",
+              borderRadius: 10,
+            }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", marginRight: 4, fontWeight: 600 }}>
+                Columns:
+              </span>
+              {ALL_COLUMNS.map((col) => {
+                const visible = !hiddenCols.has(col);
+                return (
+                  <button
+                    key={col}
+                    type="button"
+                    onClick={() => setHiddenCols(prev => {
+                      const next = new Set(prev);
+                      visible ? next.add(col) : next.delete(col);
+                      return next;
+                    })}
+                    style={{
+                      padding: "3px 10px", borderRadius: 20, fontSize: 11, cursor: "pointer",
+                      border: `1px solid ${visible ? "oklch(0.55 0.18 210 / 0.6)" : "oklch(0.3 0.05 255 / 0.4)"}`,
+                      background: visible ? "oklch(0.22 0.07 210 / 0.4)" : "transparent",
+                      color: visible ? "oklch(0.82 0.14 210)" : "var(--faint)",
+                    }}
+                  >
+                    {visible ? "✓ " : ""}{col}
+                  </button>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setHiddenCols(new Set())}
+                style={{
+                  marginLeft: "auto", fontSize: 11, color: "var(--faint)", background: "none",
+                  border: "none", cursor: "pointer", textDecoration: "underline",
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          )}
 
           <StatCards stats={stats} />
 
@@ -1347,7 +1401,8 @@ export function LaunchesPage() {
             <GridView tokens={displayedLaunches} onRowClick={handleRowClick} starred={starred} onToggleStar={toggleStar} />
           ) : (
             <TokenTable tokens={displayedLaunches} onRowClick={handleRowClick}
-              starred={starred} onToggleStar={toggleStar} onChartClick={handleRowClick} />
+              starred={starred} onToggleStar={toggleStar} onChartClick={handleRowClick}
+              hiddenCols={hiddenCols} />
           )}
 
           {hasMore && (

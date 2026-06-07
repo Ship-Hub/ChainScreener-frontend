@@ -575,8 +575,24 @@ function MetricCards({ metrics }: { metrics: ApiMetrics | null }) {
 // ─────────────────────────────────────────────────────────────
 // Activity Feed
 // ─────────────────────────────────────────────────────────────
-function ActivityFeed({ items, loading }: { items: ApiSmFeedItem[]; loading: boolean }) {
+function ActivityFeed({
+  items,
+  loading,
+  onRefresh,
+  onClear,
+}: {
+  items: ApiSmFeedItem[];
+  loading: boolean;
+  onRefresh: () => void;
+  onClear: () => void;
+}) {
   const router = useRouter();
+  const [tab, setTab] = useState<"ALL" | "BUY" | "SELL">("ALL");
+  const [expanded, setExpanded] = useState(false);
+
+  const filtered = tab === "ALL" ? items : items.filter((i) => i.action === tab);
+  const displayed = expanded ? filtered : filtered.slice(0, 8);
+
   return (
     <div className="smPanel">
       <h2 className="smPanelTitle">
@@ -585,16 +601,16 @@ function ActivityFeed({ items, loading }: { items: ApiSmFeedItem[]; loading: boo
       </h2>
 
       <div className="smFeedFilter">
-        <button className="smFeedTab active" type="button">All</button>
-        <button className="smFeedTab" type="button">Buys</button>
-        <button className="smFeedTab" type="button">Sells</button>
-        <button className="smFeedIconBtn" type="button" aria-label="Refresh feed" title="Refresh">
+        <button className={`smFeedTab ${tab === "ALL" ? "active" : ""}`} type="button" onClick={() => setTab("ALL")}>All</button>
+        <button className={`smFeedTab ${tab === "BUY" ? "active" : ""}`} type="button" onClick={() => setTab("BUY")}>Buys</button>
+        <button className={`smFeedTab ${tab === "SELL" ? "active" : ""}`} type="button" onClick={() => setTab("SELL")}>Sells</button>
+        <button className="smFeedIconBtn" type="button" aria-label="Refresh feed" title="Refresh" onClick={onRefresh}>
           <RefreshCw size={13} />
         </button>
         <button className="smFeedIconBtn" type="button" aria-label="Filter feed" title="Filter">
           <Filter size={13} />
         </button>
-        <button className="smFeedIconBtn" type="button" aria-label="Clear feed" title="Clear">
+        <button className="smFeedIconBtn" type="button" aria-label="Clear feed" title="Clear" onClick={onClear}>
           <X size={13} />
         </button>
       </div>
@@ -602,9 +618,11 @@ function ActivityFeed({ items, loading }: { items: ApiSmFeedItem[]; loading: boo
       <div className="smFeedList">
         {loading ? (
           <div style={{ color: "var(--faint)", padding: "12px 0", textAlign: "center" }}>Loading…</div>
-        ) : items.length === 0 ? (
-          <div style={{ color: "var(--faint)", padding: "12px 0", textAlign: "center" }}>No activity yet — run the indexer to populate</div>
-        ) : items.map((item) => (
+        ) : displayed.length === 0 ? (
+          <div style={{ color: "var(--faint)", padding: "12px 0", textAlign: "center" }}>
+            {items.length === 0 ? "No activity yet — run the indexer to populate" : "No items match this filter"}
+          </div>
+        ) : displayed.map((item) => (
           <div className="smFeedItem" key={item.id}>
             <div className="smFeedItemRow1">
               <span className={`smBadge ${item.action.toLowerCase()}`}>{item.action}</span>
@@ -629,9 +647,11 @@ function ActivityFeed({ items, loading }: { items: ApiSmFeedItem[]; loading: boo
         ))}
       </div>
 
-      <button className="smPanelLink" type="button">
-        View Full Feed <ArrowRight size={14} />
-      </button>
+      {filtered.length > 8 && (
+        <button className="smPanelLink" type="button" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Collapse" : `View Full Feed (${filtered.length})`} <ArrowRight size={14} />
+        </button>
+      )}
     </div>
   );
 }
@@ -640,6 +660,8 @@ function ActivityFeed({ items, loading }: { items: ApiSmFeedItem[]; loading: boo
 // Flow Map Panel
 // ─────────────────────────────────────────────────────────────
 function FlowMapPanel({ accumulated, distributed }: { accumulated: ApiFlowToken[]; distributed: ApiFlowToken[] }) {
+  const [showInfo, setShowInfo] = useState(false);
+
   const totalInflow = accumulated.reduce((s, t) => s + t.netFlowUsd, 0);
   const totalOutflow = distributed.reduce((s, t) => s + Math.abs(t.netFlowUsd), 0);
   const netFlow = totalInflow - totalOutflow;
@@ -648,6 +670,9 @@ function FlowMapPanel({ accumulated, distributed }: { accumulated: ApiFlowToken[
     : Math.abs(netFlow) >= 1000
       ? `${netFlow >= 0 ? "+" : "-"}$${(Math.abs(netFlow) / 1000).toFixed(0)}K`
       : `${netFlow >= 0 ? "+" : "-"}$${Math.abs(netFlow).toFixed(0)}`;
+
+  const BAR_MAX = 500_000;
+  const markerPct = Math.min(100, Math.max(0, ((netFlow + BAR_MAX) / (2 * BAR_MAX)) * 100));
 
   return (
     <div className="smPanel">
@@ -680,12 +705,30 @@ function FlowMapPanel({ accumulated, distributed }: { accumulated: ApiFlowToken[
           <span>+$500K</span>
         </div>
         <div className="smFlowBar">
-          <div className="smFlowBarMarker" />
+          <div className="smFlowBarMarker" style={{ left: `${markerPct}%` }} />
         </div>
         <div className="smFlowBarBottom">
           <span className="smFlowBarCurrent">Net Flow: {netFlowFmt}</span>
-          <button className="smHowItWorks" type="button">How it works?</button>
+          <button className="smHowItWorks" type="button" onClick={() => setShowInfo((v) => !v)}>
+            How it works?
+          </button>
         </div>
+        {showInfo && (
+          <div style={{
+            marginTop: 8, padding: "10px 12px", borderRadius: 8,
+            background: "oklch(0.18 0.04 255 / 0.9)", border: "1px solid oklch(0.32 0.06 255 / 0.4)",
+            fontSize: 12, color: "var(--muted)", lineHeight: 1.6,
+          }}>
+            The bar shows net USD flow (smart wallet buys minus sells) over the selected timeframe, clamped to ±$500K. The marker moves right for net inflow and left for net outflow.
+            <button
+              type="button"
+              onClick={() => setShowInfo(false)}
+              style={{ float: "right", background: "none", border: "none", color: "var(--faint)", cursor: "pointer" }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -695,6 +738,12 @@ function FlowMapPanel({ accumulated, distributed }: { accumulated: ApiFlowToken[
 // Accumulated / Distributed Tables
 // ─────────────────────────────────────────────────────────────
 function AccumulatedDistributed({ accumulated, distributed }: { accumulated: ApiFlowToken[]; distributed: ApiFlowToken[] }) {
+  const [accExpanded, setAccExpanded] = useState(false);
+  const [distExpanded, setDistExpanded] = useState(false);
+  const PREVIEW = 5;
+  const displayedAcc = accExpanded ? accumulated : accumulated.slice(0, PREVIEW);
+  const displayedDist = distExpanded ? distributed : distributed.slice(0, PREVIEW);
+
   return (
     <div className="smPanel">
       {/* Most Accumulated */}
@@ -712,9 +761,9 @@ function AccumulatedDistributed({ accumulated, distributed }: { accumulated: Api
           </tr>
         </thead>
         <tbody>
-          {accumulated.length === 0 ? (
+          {displayedAcc.length === 0 ? (
             <tr><td colSpan={4} style={{ color: "var(--faint)", textAlign: "center" }}>No data yet</td></tr>
-          ) : accumulated.map((row) => (
+          ) : displayedAcc.map((row) => (
             <tr key={`${row.chain}:${row.tokenAddress}`}>
               <td>
                 <span className="smTokenTicker">
@@ -733,7 +782,11 @@ function AccumulatedDistributed({ accumulated, distributed }: { accumulated: Api
           ))}
         </tbody>
       </table>
-      <button className="smPanelLink" type="button">View All <ArrowRight size={14} /></button>
+      {accumulated.length > PREVIEW && (
+        <button className="smPanelLink" type="button" onClick={() => setAccExpanded((v) => !v)}>
+          {accExpanded ? "Collapse" : `View All (${accumulated.length})`} <ArrowRight size={14} />
+        </button>
+      )}
 
       <div className="smTableDivider" />
 
@@ -752,9 +805,9 @@ function AccumulatedDistributed({ accumulated, distributed }: { accumulated: Api
           </tr>
         </thead>
         <tbody>
-          {distributed.length === 0 ? (
+          {displayedDist.length === 0 ? (
             <tr><td colSpan={4} style={{ color: "var(--faint)", textAlign: "center" }}>No data yet</td></tr>
-          ) : distributed.map((row) => (
+          ) : displayedDist.map((row) => (
             <tr key={`${row.chain}:${row.tokenAddress}`}>
               <td>
                 <span className="smTokenTicker">
@@ -773,6 +826,11 @@ function AccumulatedDistributed({ accumulated, distributed }: { accumulated: Api
           ))}
         </tbody>
       </table>
+      {distributed.length > PREVIEW && (
+        <button className="smPanelLink" type="button" onClick={() => setDistExpanded((v) => !v)}>
+          {distExpanded ? "Collapse" : `View All (${distributed.length})`} <ArrowRight size={14} />
+        </button>
+      )}
     </div>
   );
 }
@@ -782,6 +840,9 @@ function AccumulatedDistributed({ accumulated, distributed }: { accumulated: Api
 // ─────────────────────────────────────────────────────────────
 function Leaderboard({ entries, loading }: { entries: ApiLeaderEntry[]; loading: boolean }) {
   const router = useRouter();
+  const [expanded, setExpanded] = useState(false);
+  const PREVIEW = 8;
+  const displayed = expanded ? entries : entries.slice(0, PREVIEW);
   const rankClass = (rank: number) =>
     rank === 1 ? "gold" : rank === 2 ? "silver" : rank === 3 ? "bronze" : "";
 
@@ -805,9 +866,9 @@ function Leaderboard({ entries, loading }: { entries: ApiLeaderEntry[]; loading:
         <tbody>
           {loading ? (
             <tr><td colSpan={6} style={{ color: "var(--faint)", textAlign: "center" }}>Loading…</td></tr>
-          ) : entries.length === 0 ? (
+          ) : displayed.length === 0 ? (
             <tr><td colSpan={6} style={{ color: "var(--faint)", textAlign: "center" }}>No smart wallets yet — run indexer:smart-wallets</td></tr>
-          ) : entries.map((row) => (
+          ) : displayed.map((row) => (
             <tr key={row.wallet} onClick={() => router.push(`/wallet/${row.wallet}`)}>
               <td><span className={`smRank ${rankClass(row.rank)}`}>{row.rank}</span></td>
               <td>
@@ -837,9 +898,11 @@ function Leaderboard({ entries, loading }: { entries: ApiLeaderEntry[]; loading:
           ))}
         </tbody>
       </table>
-      <button className="smPanelLink" type="button">
-        View Full Leaderboard <ArrowRight size={14} />
-      </button>
+      {entries.length > PREVIEW && (
+        <button className="smPanelLink" type="button" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "Collapse" : `View Full Leaderboard (${entries.length})`} <ArrowRight size={14} />
+        </button>
+      )}
     </div>
   );
 }
@@ -968,6 +1031,7 @@ function ConsensusSignals({ rows }: { rows: ApiConsensusRow[] }) {
 // Alert Ticker
 // ─────────────────────────────────────────────────────────────
 function AlertTicker({ feedItems }: { feedItems: ApiSmFeedItem[] }) {
+  const router = useRouter();
   const tickerItems = feedItems.length > 0 ? [...feedItems, ...feedItems] : [];
   return (
     <div className="smAlertTicker" role="marquee" aria-label="Smart money alerts">
@@ -994,7 +1058,7 @@ function AlertTicker({ feedItems }: { feedItems: ApiSmFeedItem[] }) {
           ))}
         </div>
       </div>
-      <button className="smAlertViewAll" type="button">
+      <button className="smAlertViewAll" type="button" onClick={() => router.push("/alerts")}>
         View All Alerts <ArrowRight size={13} />
       </button>
     </div>
@@ -1004,7 +1068,10 @@ function AlertTicker({ feedItems }: { feedItems: ApiSmFeedItem[] }) {
 // ─────────────────────────────────────────────────────────────
 // Main Page Component
 // ─────────────────────────────────────────────────────────────
+const TIMEFRAME_HOURS: Record<Timeframe, number> = { "1H": 1, "6H": 6, "24H": 24, "7D": 168 };
+
 export function SmartMoneyPage() {
+  const router = useRouter();
   const [timeframe, setTimeframe] = useState<Timeframe>("24H");
   const timeframes: Timeframe[] = ["1H", "6H", "24H", "7D"];
 
@@ -1016,8 +1083,6 @@ export function SmartMoneyPage() {
   const [metrics, setMetrics] = useState<ApiMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const TIMEFRAME_HOURS: Record<Timeframe, number> = { "1H": 1, "6H": 6, "24H": 24, "7D": 168 };
-
   const fetchData = useCallback(async (tf: Timeframe) => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
     const h = TIMEFRAME_HOURS[tf];
@@ -1025,7 +1090,7 @@ export function SmartMoneyPage() {
     try {
       await Promise.all([
         fetch(`${api}/api/smart-money/feed?hours=${h}&limit=20`).then(r => r.json()).then(d => setFeed(d.data ?? [])),
-        fetch(`${api}/api/smart-money/leaderboard?limit=20`).then(r => r.json()).then(d => setLeaderboard(d.data ?? [])),
+        fetch(`${api}/api/smart-money/leaderboard?limit=20&hours=${h}`).then(r => r.json()).then(d => setLeaderboard(d.data ?? [])),
         fetch(`${api}/api/smart-money/flow?hours=${h}`).then(r => r.json()).then(d => { setAccumulated(d.data?.accumulated ?? []); setDistributed(d.data?.distributed ?? []); }),
         fetch(`${api}/api/smart-money/consensus?hours=${h}`).then(r => r.json()).then(d => setConsensus(d.data ?? [])),
         fetch(`${api}/api/smart-money/metrics?hours=${h}`).then(r => r.json()).then(d => setMetrics(d.data ?? null)),
@@ -1072,7 +1137,7 @@ export function SmartMoneyPage() {
                   </button>
                 ))}
               </div>
-              <button className="smGearBtn" type="button" aria-label="Settings">
+              <button className="smGearBtn" type="button" aria-label="Settings" onClick={() => router.push("/settings")}>
                 <Settings size={16} />
               </button>
             </div>
@@ -1083,7 +1148,12 @@ export function SmartMoneyPage() {
 
           {/* Main 3-column section */}
           <div className="smContentGrid">
-            <ActivityFeed items={feed} loading={loading} />
+            <ActivityFeed
+              items={feed}
+              loading={loading}
+              onRefresh={() => fetchData(timeframe)}
+              onClear={() => setFeed([])}
+            />
             <FlowMapPanel accumulated={accumulated} distributed={distributed} />
             <AccumulatedDistributed accumulated={accumulated} distributed={distributed} />
           </div>

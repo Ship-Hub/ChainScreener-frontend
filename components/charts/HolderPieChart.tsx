@@ -2,14 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-type DistributionSlice = { name: string; pct: number; count: number; color: string };
-
-const distribution: DistributionSlice[] = [
-  { name: "Whales (>$10K)", pct: 24.3, count: 87,   color: "oklch(0.62 0.23 285)" },
-  { name: "Large (>$1K)",   pct: 31.7, count: 342,  color: "oklch(0.78 0.17 210)" },
-  { name: "Medium (>$100)", pct: 28.4, count: 622,  color: "oklch(0.76 0.19 151)" },
-  { name: "Small (<$100)",  pct: 15.6, count: 1142, color: "oklch(0.83 0.18 83)"  },
-];
+type DistributionSlice = { name: string; pct: number; color: string };
 
 function DonutTooltip({ active, payload }: {
   active?: boolean;
@@ -20,15 +13,25 @@ function DonutTooltip({ active, payload }: {
   return (
     <div className="haChartTooltip">
       <div className="haTooltipLabel">{slice.name}</div>
-      <div className="haTooltipValue" style={{ color: slice.color }}>{slice.pct}%</div>
-      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
-        ~{slice.count.toLocaleString()} wallets
-      </div>
+      <div className="haTooltipValue" style={{ color: slice.color }}>{slice.pct.toFixed(1)}%</div>
     </div>
   );
 }
 
-export default function HolderPieChart() {
+// When real top10Pct is available: show "Top 10" vs "Others"
+// Fallback (no data): show empty/placeholder
+export default function HolderPieChart({ top10Pct }: { top10Pct?: number }) {
+  const hasData = top10Pct !== undefined && top10Pct > 0;
+
+  const distribution: DistributionSlice[] = hasData
+    ? [
+        { name: "Top 10 Holders", pct: Math.min(top10Pct!, 100), color: "oklch(0.62 0.23 285)" },
+        { name: "Other Holders",  pct: Math.max(0, 100 - top10Pct!), color: "oklch(0.76 0.19 151)" },
+      ]
+    : [
+        { name: "No data",   pct: 100, color: "oklch(0.28 0.04 255)" },
+      ];
+
   return (
     <>
       <div className="haDonutWrap">
@@ -40,7 +43,7 @@ export default function HolderPieChart() {
               cy="50%"
               innerRadius={58}
               outerRadius={88}
-              paddingAngle={3}
+              paddingAngle={hasData ? 3 : 0}
               dataKey="pct"
               strokeWidth={0}
             >
@@ -48,25 +51,32 @@ export default function HolderPieChart() {
                 <Cell key={slice.name} fill={slice.color} />
               ))}
             </Pie>
-            <Tooltip content={<DonutTooltip />} />
+            {hasData && <Tooltip content={<DonutTooltip />} />}
           </PieChart>
         </ResponsiveContainer>
       </div>
 
       <div className="haDistLegend">
-        {distribution.map((slice) => (
-          <div className="haDistLegendRow" key={slice.name}>
-            <span className="haDistDot" style={{ background: slice.color }} />
-            <span className="haDistLabel">{slice.name}</span>
-            <span className="haDistPct">{slice.pct}%</span>
-            <span className="haDistCount">~{slice.count.toLocaleString()}</span>
+        {hasData ? (
+          distribution.map((slice) => (
+            <div className="haDistLegendRow" key={slice.name}>
+              <span className="haDistDot" style={{ background: slice.color }} />
+              <span className="haDistLabel">{slice.name}</span>
+              <span className="haDistPct">{slice.pct.toFixed(1)}%</span>
+            </div>
+          ))
+        ) : (
+          <div style={{ color: "var(--faint)", fontSize: 12, textAlign: "center", padding: "4px 0" }}>
+            Holder snapshot not yet available
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="haConcentrationWarning">
-        <span>⚠</span> Top 10 holders control 34.2% of supply
-      </div>
+      {hasData && (
+        <div className="haConcentrationWarning">
+          <span>⚠</span> Top 10 holders control {top10Pct!.toFixed(1)}% of supply
+        </div>
+      )}
     </>
   );
 }

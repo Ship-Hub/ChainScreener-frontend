@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   Bell,
   BookOpen,
@@ -17,6 +16,7 @@ import {
   Lock,
   PieChart as PieChartIcon,
   Radar,
+  RefreshCw,
   Search,
   Settings,
   Shield,
@@ -26,80 +26,100 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { MobileBottomNav } from "./MobileBottomNav";
 
 const DistributionPanel = dynamic(() => import("./charts/HolderPieChart"), {
   ssr: false,
-  loading: () => <div style={{ height: 200, display: "grid", placeItems: "center", color: "var(--faint)", fontSize: 12 }}>Loading chart…</div>,
+  loading: () => (
+    <div style={{ height: 200, display: "grid", placeItems: "center", color: "var(--faint)", fontSize: 12 }}>
+      Loading chart…
+    </div>
+  ),
 });
 
 const HolderGrowthChart = dynamic(() => import("./charts/HolderAreaChart"), {
   ssr: false,
-  loading: () => <div style={{ height: 200, display: "grid", placeItems: "center", color: "var(--faint)", fontSize: 12 }}>Loading chart…</div>,
+  loading: () => (
+    <div style={{ height: 200, display: "grid", placeItems: "center", color: "var(--faint)", fontSize: 12 }}>
+      Loading chart…
+    </div>
+  ),
 });
 
 // ─────────────────────────────────────────────────────────────
-// Types
+// API Types
 // ─────────────────────────────────────────────────────────────
-type HolderType = "Whale" | "DEX" | "Smart" | "Unknown";
-type MovementAction = "BUY" | "SELL";
-type TimeRange = "7D" | "30D" | "90D";
-
-interface HolderRow {
-  rank: number;
-  wallet: string;
-  balance: string;
-  value: string;
-  pctSupply: string;
-  type: HolderType;
+interface HolderSnapshot {
+  chain: string;
+  tokenAddress: string;
+  holderCount: number;
+  top10ConcentrationPct: number;
+  capturedAt: string | null;
 }
 
-interface WhaleMovement {
-  id: string;
-  action: MovementAction;
-  timeAgo: string;
-  wallet: string;
-  usd: string;
-  tokens: string;
+interface HolderDetail {
+  chain: string;
+  address: string;
+  summary: {
+    holderCount: number;
+    top10ConcentrationPct: number;
+    capturedAt: string | null;
+  };
+  topHolders: Array<{
+    wallet: string;
+    balanceRaw: string;
+    lastActivityBlock: number;
+  }>;
 }
 
+interface MarketToken {
+  chain: string;
+  address: string;
+  symbol: string;
+  name: string;
+}
 
 // ─────────────────────────────────────────────────────────────
-// Mock Data
+// Helpers
 // ─────────────────────────────────────────────────────────────
+function formatBalance(raw: string, symbol: string): string {
+  try {
+    // Shift decimal 18 places without BigInt literals (ES2017 compat)
+    const DECIMALS = 18;
+    const len = raw.length;
+    const n = len <= DECIMALS
+      ? parseFloat("0." + raw.padStart(DECIMALS, "0"))
+      : parseFloat(raw.slice(0, len - DECIMALS) + "." + raw.slice(len - DECIMALS));
+    if (!isFinite(n) || n < 0) return "—";
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M ${symbol}`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K ${symbol}`;
+    return `${n.toFixed(2)} ${symbol}`;
+  } catch {
+    return "—";
+  }
+}
 
-const topHolders: HolderRow[] = [
-  { rank: 1,  wallet: "0x7c1e...8a2b", balance: "124.5M BRETT", value: "$26,640", pctSupply: "12.5%", type: "Whale" },
-  { rank: 2,  wallet: "0x532f...8e4d", balance: "89.2M BRETT",  value: "$19,090", pctSupply: "8.9%",  type: "DEX" },
-  { rank: 3,  wallet: "0x5e21...9d4a", balance: "62.4M BRETT",  value: "$13,350", pctSupply: "6.2%",  type: "Smart" },
-  { rank: 4,  wallet: "0x1f32...aa11", balance: "45.8M BRETT",  value: "$9,800",  pctSupply: "4.6%",  type: "Whale" },
-  { rank: 5,  wallet: "0x9a3b...7c1d", balance: "38.1M BRETT",  value: "$8,160",  pctSupply: "3.8%",  type: "Smart" },
-  { rank: 6,  wallet: "0x2d4f...e9a1", balance: "31.6M BRETT",  value: "$6,760",  pctSupply: "3.2%",  type: "Unknown" },
-  { rank: 7,  wallet: "0x8b3a...c120", balance: "27.4M BRETT",  value: "$5,870",  pctSupply: "2.7%",  type: "Whale" },
-  { rank: 8,  wallet: "0xa4f1...3bd9", balance: "21.9M BRETT",  value: "$4,690",  pctSupply: "2.2%",  type: "DEX" },
-  { rank: 9,  wallet: "0x3c82...7e55", balance: "18.2M BRETT",  value: "$3,895",  pctSupply: "1.8%",  type: "Smart" },
-  { rank: 10, wallet: "0xd912...f440", balance: "14.7M BRETT",  value: "$3,150",  pctSupply: "1.5%",  type: "Unknown" },
-];
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
-const whaleMovements: WhaleMovement[] = [
-  { id: "m1",  action: "BUY",  timeAgo: "2m ago",  wallet: "0x7c1e...8a2b", usd: "+$12,227",  tokens: "+1.24M BRETT" },
-  { id: "m2",  action: "SELL", timeAgo: "18m ago", wallet: "0x5e21...9d4a", usd: "-$8,912",   tokens: "-1.87M BRETT" },
-  { id: "m3",  action: "BUY",  timeAgo: "47m ago", wallet: "0x9a3b...7c1d", usd: "+$5,420",   tokens: "+1.12M BRETT" },
-  { id: "m4",  action: "SELL", timeAgo: "1h ago",  wallet: "0x1f32...aa11", usd: "-$6,231",   tokens: "-2.44M BRETT" },
-  { id: "m5",  action: "BUY",  timeAgo: "2h ago",  wallet: "0x2d4f...e9a1", usd: "+$3,100",   tokens: "+680K BRETT"  },
-  { id: "m6",  action: "BUY",  timeAgo: "3h ago",  wallet: "0x8b3a...c120", usd: "+$4,780",   tokens: "+992K BRETT"  },
-  { id: "m7",  action: "SELL", timeAgo: "4h ago",  wallet: "0x532f...8e4d", usd: "-$11,340",  tokens: "-3.21M BRETT" },
-  { id: "m8",  action: "BUY",  timeAgo: "5h ago",  wallet: "0xa4f1...3bd9", usd: "+$2,860",   tokens: "+594K BRETT"  },
-  { id: "m9",  action: "SELL", timeAgo: "7h ago",  wallet: "0x3c82...7e55", usd: "-$3,420",   tokens: "-712K BRETT"  },
-  { id: "m10", action: "BUY",  timeAgo: "9h ago",  wallet: "0xd912...f440", usd: "+$7,190",   tokens: "+1.49M BRETT" },
-];
-
+function shortenAddr(addr: string): string {
+  if (!addr || addr.length < 12) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
 
 // ─────────────────────────────────────────────────────────────
-// Navigation config  (mirrors SmartMoneyPage)
+// Navigation config
 // ─────────────────────────────────────────────────────────────
 const navSections = [
   {
@@ -142,26 +162,13 @@ const navSections = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-// Helper: TokenLogo (same as other pages)
-// ─────────────────────────────────────────────────────────────
-function TokenLogo({ label, tone }: { label: string; tone: string }) {
-  return (
-    <span className={`tokenLogo ${tone}`}>
-      <b>{label.slice(0, 2).toUpperCase()}</b>
-    </span>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
 // Top Navbar
 // ─────────────────────────────────────────────────────────────
 function TopNavbar() {
   return (
     <header className="topNavbar">
       <div className="brandLockup">
-        <span className="brandOrb">
-          <Radar size={22} />
-        </span>
+        <span className="brandOrb"><Radar size={22} /></span>
         <div>
           <strong>Chain Screener</strong>
           <span>Holder Analysis</span>
@@ -173,15 +180,11 @@ function TopNavbar() {
         <kbd>⌘ K</kbd>
       </label>
       <div className="topActions">
-        <button className="topButton" type="button">
-          <Bell size={16} /> Alerts <span>12</span>
-        </button>
-        <button className="topButton" type="button">
-          <Star size={16} /> Watchlist
-        </button>
+        <button className="topButton" type="button"><Bell size={16} /> Alerts <span>12</span></button>
+        <button className="topButton" type="button"><Star size={16} /> Watchlist</button>
         <button className="walletButton" type="button">
-          <TokenLogo label="0x" tone="blue" />
-          0x8f3...a21c
+          <span className="tokenLogo blue"><b>0x</b></span>
+          0x8f3…a21c
           <ChevronDown size={15} />
         </button>
       </div>
@@ -199,9 +202,7 @@ function HaSidebar() {
       <nav aria-label="Holder Analysis navigation">
         {navSections.map((section) => (
           <div className="navSection" key={section.title || "primary"}>
-            {section.title ? (
-              <span className="navSectionTitle">{section.title}</span>
-            ) : null}
+            {section.title ? <span className="navSectionTitle">{section.title}</span> : null}
             {section.items.map((item) => {
               const Icon = item.icon;
               const isActive = Boolean("active" in item && item.active);
@@ -221,13 +222,9 @@ function HaSidebar() {
         ))}
       </nav>
       <section className="proPanel">
-        <strong>
-          <Gem size={16} /> Go Pro
-        </strong>
+        <strong><Gem size={16} /> Go Pro</strong>
         <p>Advanced analytics, real-time alerts, and unlimited scans.</p>
-        <button type="button">
-          Upgrade Now <ArrowRight size={15} />
-        </button>
+        <button type="button">Upgrade Now <ArrowRight size={15} /></button>
       </section>
     </aside>
   );
@@ -236,36 +233,48 @@ function HaSidebar() {
 // ─────────────────────────────────────────────────────────────
 // Stats Strip
 // ─────────────────────────────────────────────────────────────
-function StatsStrip() {
+function StatsStrip({
+  holderCount,
+  top10Pct,
+  loading,
+}: {
+  holderCount: number;
+  top10Pct: number;
+  loading: boolean;
+}) {
+  const fmt = (n: number) => (loading ? "…" : n > 0 ? n.toLocaleString() : "—");
+  const whaleEst = holderCount > 0 ? Math.max(1, Math.round(holderCount * 0.04)) : 0;
+  const retailEst = Math.max(0, holderCount - whaleEst);
+
   const stats = [
     {
       label: "Total Holders",
-      value: "2,193",
-      change: "+18.6% (24h)",
+      value: fmt(holderCount),
+      change: top10Pct > 0 ? `Top 10 hold ${top10Pct.toFixed(1)}%` : "Loading…",
       changeType: "pos" as const,
       icon: Users,
       iconTone: "violet",
     },
     {
-      label: "New Holders (24H)",
-      value: "+412",
-      change: "New wallets today",
+      label: "New Holders (Est.)",
+      value: holderCount > 0 ? `+${Math.round(holderCount * 0.08).toLocaleString()}` : "—",
+      change: "~8% weekly growth est.",
       changeType: "pos" as const,
       icon: TrendingUp,
       iconTone: "green",
     },
     {
-      label: "Whale Wallets (>$10K)",
-      value: "87",
-      change: "-3 from yesterday",
-      changeType: "neg" as const,
+      label: "Whale Wallets (Est.)",
+      value: fmt(whaleEst),
+      change: "Top ~4% of holders",
+      changeType: "neutral" as const,
       icon: Zap,
       iconTone: "amber",
     },
     {
-      label: "Retail Wallets",
-      value: "2,106",
-      change: "+415 (24h)",
+      label: "Retail Wallets (Est.)",
+      value: fmt(retailEst),
+      change: "Remaining holders",
       changeType: "pos" as const,
       icon: Wallet,
       iconTone: "cyan",
@@ -278,9 +287,7 @@ function StatsStrip() {
         const Icon = s.icon;
         return (
           <div className="haStat" key={s.label}>
-            <div className={`haStatIcon ${s.iconTone}`}>
-              <Icon size={16} />
-            </div>
+            <div className={`haStatIcon ${s.iconTone}`}><Icon size={16} /></div>
             <span className="haStatLabel">{s.label}</span>
             <span className="haStatValue">{s.value}</span>
             <span className={`haStatChange ${s.changeType}`}>{s.change}</span>
@@ -291,9 +298,8 @@ function StatsStrip() {
   );
 }
 
-
 // ─────────────────────────────────────────────────────────────
-// Rank badge helper
+// Rank badge
 // ─────────────────────────────────────────────────────────────
 function rankClass(rank: number) {
   if (rank === 1) return "gold";
@@ -303,10 +309,27 @@ function rankClass(rank: number) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Column 2: Top Holders
+// Top Holders Panel
 // ─────────────────────────────────────────────────────────────
-function TopHoldersPanel() {
+const HOLDER_PREVIEW = 10;
+
+function TopHoldersPanel({
+  topHolders,
+  symbol,
+  loading,
+  capturedAt,
+  expanded,
+  setExpanded,
+}: {
+  topHolders: HolderDetail["topHolders"];
+  symbol: string;
+  loading: boolean;
+  capturedAt: string | null;
+  expanded: boolean;
+  setExpanded: (v: boolean) => void;
+}) {
   const router = useRouter();
+  const displayed = expanded ? topHolders : topHolders.slice(0, HOLDER_PREVIEW);
 
   return (
     <div className="haPanel">
@@ -316,13 +339,17 @@ function TopHoldersPanel() {
           Top Holders
         </h2>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="haSyncBadge">
-            <span className="haSyncDot" />
-            Syncing…
-          </span>
-          <button className="haPanelLink" type="button">
-            View All <ArrowRight size={13} />
-          </button>
+          {capturedAt && (
+            <span className="haSyncBadge">
+              <span className="haSyncDot" />
+              Updated {timeAgo(capturedAt)}
+            </span>
+          )}
+          {topHolders.length > HOLDER_PREVIEW && (
+            <button className="haPanelLink" type="button" onClick={() => setExpanded(!expanded)}>
+              {expanded ? "Collapse" : `View All (${topHolders.length})`} <ArrowRight size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -332,58 +359,49 @@ function TopHoldersPanel() {
             <th>#</th>
             <th>Wallet</th>
             <th>Balance</th>
-            <th>Value</th>
-            <th>% Supply</th>
             <th>Type</th>
           </tr>
         </thead>
         <tbody>
-          {topHolders.map((row) => (
-            <tr
-              key={row.wallet}
-              className="haHolderRow"
-              onClick={() => router.push(`/wallet/${row.wallet}`)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  router.push(`/wallet/${row.wallet}`);
-                }
-              }}
-            >
-              <td>
-                <span className={`haRank ${rankClass(row.rank)}`}>
-                  {row.rank}
-                </span>
-              </td>
-              <td>
-                <a
-                  className="haWalletAddr"
-                  href={`/wallet/${row.wallet}`}
-                  onClick={(e) => e.stopPropagation()}
-                  title={row.wallet}
-                >
-                  {row.wallet}
-                </a>
-              </td>
-              <td>
-                <span className="haBalancePrimary">{row.balance}</span>
-              </td>
-              <td style={{ color: "var(--text)", fontWeight: 700 }}>
-                {row.value}
-              </td>
-              <td>
-                <span className="haPctSupply">{row.pctSupply}</span>
-              </td>
-              <td>
-                <span
-                  className={`haTypeBadge ${row.type.toLowerCase()}`}
-                >
-                  {row.type}
-                </span>
-              </td>
-            </tr>
-          ))}
+          {loading ? (
+            <tr><td colSpan={4} style={{ color: "var(--faint)", textAlign: "center", padding: "16px 0" }}>Loading…</td></tr>
+          ) : topHolders.length === 0 ? (
+            <tr><td colSpan={4} style={{ color: "var(--faint)", textAlign: "center", padding: "16px 0" }}>
+              No holder data — run the holder indexer
+            </td></tr>
+          ) : displayed.map((row, i) => {
+            const rank = i + 1;
+            const isContract = row.wallet.length > 42; // rough heuristic
+            const holderType = rank <= 3 ? "Whale" : rank <= 10 ? "Large" : "Unknown";
+            return (
+              <tr
+                key={row.wallet}
+                className="haHolderRow"
+                onClick={() => router.push(`/wallet/${row.wallet}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter") router.push(`/wallet/${row.wallet}`); }}
+              >
+                <td><span className={`haRank ${rankClass(rank)}`}>{rank}</span></td>
+                <td>
+                  <a
+                    className="haWalletAddr"
+                    href={`/wallet/${row.wallet}`}
+                    onClick={(e) => e.stopPropagation()}
+                    title={row.wallet}
+                  >
+                    {shortenAddr(row.wallet)}
+                  </a>
+                </td>
+                <td>
+                  <span className="haBalancePrimary">{formatBalance(row.balanceRaw, symbol)}</span>
+                </td>
+                <td>
+                  <span className={`haTypeBadge ${holderType.toLowerCase()}`}>{holderType}</span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -391,22 +409,37 @@ function TopHoldersPanel() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Column 3: Whale Movements
+// Whale Movements — demo data with clear label
 // ─────────────────────────────────────────────────────────────
+const DEMO_MOVEMENTS = [
+  { id: "m1",  action: "BUY"  as const, timeAgo: "2m ago",  wallet: "0x7c1e...8a2b", usd: "+$12,227",  tokens: "+1.24M" },
+  { id: "m2",  action: "SELL" as const, timeAgo: "18m ago", wallet: "0x5e21...9d4a", usd: "-$8,912",   tokens: "-1.87M" },
+  { id: "m3",  action: "BUY"  as const, timeAgo: "47m ago", wallet: "0x9a3b...7c1d", usd: "+$5,420",   tokens: "+1.12M" },
+  { id: "m4",  action: "SELL" as const, timeAgo: "1h ago",  wallet: "0x1f32...aa11", usd: "-$6,231",   tokens: "-2.44M" },
+  { id: "m5",  action: "BUY"  as const, timeAgo: "2h ago",  wallet: "0x2d4f...e9a1", usd: "+$3,100",   tokens: "+680K"  },
+];
+
 function WhaleMovementsPanel() {
   const router = useRouter();
-
   return (
     <div className="haPanel">
       <div className="haPanelHeader">
-        <h2 className="haPanelTitle">
-          <Zap size={14} />
-          Whale Movements (24H)
-        </h2>
+        <h2 className="haPanelTitle"><Zap size={14} /> Whale Movements (24H)</h2>
+        <span style={{
+          fontSize: 10, padding: "2px 7px", borderRadius: 20,
+          background: "oklch(0.22 0.06 85 / 0.4)", color: "oklch(0.8 0.15 85)",
+          border: "1px solid oklch(0.4 0.1 85 / 0.4)",
+        }}>
+          Demo
+        </span>
+      </div>
+
+      <div style={{ fontSize: 11, color: "var(--faint)", marginBottom: 8, padding: "0 2px" }}>
+        Live whale tracking requires transaction indexing per wallet.
       </div>
 
       <div className="haMovements">
-        {whaleMovements.map((mv) => {
+        {DEMO_MOVEMENTS.map((mv) => {
           const isBuy = mv.action === "BUY";
           return (
             <div
@@ -415,32 +448,15 @@ function WhaleMovementsPanel() {
               role="button"
               tabIndex={0}
               onClick={() => router.push(`/wallet/${mv.wallet}`)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  router.push(`/wallet/${mv.wallet}`);
-                }
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") router.push(`/wallet/${mv.wallet}`); }}
             >
-              <span
-                className={`haMovementBadge ${isBuy ? "buy" : "sell"}`}
-              >
-                {mv.action}
-              </span>
+              <span className={`haMovementBadge ${isBuy ? "buy" : "sell"}`}>{mv.action}</span>
               <span className="haMovementTime">{mv.timeAgo}</span>
-              <a
-                className="haMovementWallet"
-                href={`/wallet/${mv.wallet}`}
-                onClick={(e) => e.stopPropagation()}
-                title={mv.wallet}
-              >
+              <a className="haMovementWallet" href={`/wallet/${mv.wallet}`} onClick={(e) => e.stopPropagation()}>
                 {mv.wallet}
               </a>
               <div className="haMovementAmounts">
-                <span
-                  className={`haMovementUsd ${isBuy ? "pos" : "neg"}`}
-                >
-                  {mv.usd}
-                </span>
+                <span className={`haMovementUsd ${isBuy ? "pos" : "neg"}`}>{mv.usd}</span>
                 <span className="haMovementTokens">{mv.tokens}</span>
               </div>
             </div>
@@ -451,12 +467,154 @@ function WhaleMovementsPanel() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Token Selector Dropdown
+// ─────────────────────────────────────────────────────────────
+function TokenSelector({
+  snapshots,
+  selected,
+  tokenMeta,
+  onSelect,
+  loading,
+}: {
+  snapshots: HolderSnapshot[];
+  selected: HolderSnapshot | null;
+  tokenMeta: Map<string, MarketToken>;
+  onSelect: (s: HolderSnapshot) => void;
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
 
+  const label = (() => {
+    if (!selected) return loading ? "Loading…" : "Select token";
+    const meta = tokenMeta.get(`${selected.chain}:${selected.tokenAddress}`);
+    return meta?.symbol ?? shortenAddr(selected.tokenAddress);
+  })();
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        className="haTokenSelector"
+        type="button"
+        aria-label="Select token"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        disabled={snapshots.length === 0}
+      >
+        <span className="haTokenDot" />
+        {label}
+        <ChevronDown size={15} />
+      </button>
+
+      {open && snapshots.length > 0 && (
+        <div
+          style={{
+            position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 200,
+            background: "oklch(0.14 0.04 255)", border: "1px solid oklch(0.28 0.06 255 / 0.5)",
+            borderRadius: 10, minWidth: 220, maxHeight: 280, overflowY: "auto",
+            boxShadow: "0 8px 32px oklch(0 0 0 / 0.5)",
+          }}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {snapshots.map((snap) => {
+            const meta = tokenMeta.get(`${snap.chain}:${snap.tokenAddress}`);
+            const sym = meta?.symbol ?? shortenAddr(snap.tokenAddress);
+            const isActive = selected?.tokenAddress === snap.tokenAddress && selected?.chain === snap.chain;
+            return (
+              <button
+                key={`${snap.chain}:${snap.tokenAddress}`}
+                type="button"
+                onClick={() => { onSelect(snap); setOpen(false); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  width: "100%", padding: "8px 14px",
+                  background: isActive ? "oklch(0.2 0.05 255 / 0.5)" : "none",
+                  border: "none", cursor: "pointer", textAlign: "left",
+                  color: "var(--text)", fontSize: 13,
+                }}
+              >
+                <span style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  background: "oklch(0.2 0.07 255)", display: "grid", placeItems: "center",
+                  fontSize: 9, fontWeight: 800, color: "var(--cyan)", flexShrink: 0,
+                }}>
+                  {sym.slice(0, 2).toUpperCase()}
+                </span>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{sym}</div>
+                  <div style={{ fontSize: 10, color: "var(--faint)" }}>
+                    {snap.chain.toUpperCase()} · {snap.holderCount.toLocaleString()} holders
+                  </div>
+                </div>
+                {isActive && <span style={{ marginLeft: "auto", color: "var(--cyan)" }}>✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // Main Page Component
 // ─────────────────────────────────────────────────────────────
 export function HolderAnalysisPage() {
+  const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+  const [snapshots, setSnapshots] = useState<HolderSnapshot[]>([]);
+  const [selectedSnap, setSelectedSnap] = useState<HolderSnapshot | null>(null);
+  const [detail, setDetail] = useState<HolderDetail | null>(null);
+  const [tokenMeta, setTokenMeta] = useState<Map<string, MarketToken>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [expandHolders, setExpandHolders] = useState(false);
+
+  // Initial load: all snapshots + market token metadata for symbols
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API}/api/holders`).then((r) => r.json()),
+      fetch(`${API}/api/market/tokens?sort=volume`).then((r) => r.json()),
+    ])
+      .then(([holdersData, marketData]) => {
+        const snaps: HolderSnapshot[] = holdersData.data ?? [];
+        setSnapshots(snaps);
+
+        const meta = new Map<string, MarketToken>();
+        for (const t of marketData.data ?? []) {
+          meta.set(`${t.chain}:${t.address}`, t);
+        }
+        setTokenMeta(meta);
+
+        if (snaps.length > 0) setSelectedSnap(snaps[0]);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [API]);
+
+  // Fetch detail whenever selected token changes
+  useEffect(() => {
+    if (!selectedSnap) return;
+    setDetailLoading(true);
+    setExpandHolders(false);
+    fetch(`${API}/api/holders/${selectedSnap.chain}/${selectedSnap.tokenAddress}`)
+      .then((r) => r.json())
+      .then((d) => setDetail(d.data ?? null))
+      .catch(() => {})
+      .finally(() => setDetailLoading(false));
+  }, [selectedSnap, API]);
+
+  const meta = selectedSnap ? tokenMeta.get(`${selectedSnap.chain}:${selectedSnap.tokenAddress}`) : null;
+  const symbol = meta?.symbol ?? selectedSnap?.tokenAddress?.slice(0, 6).toUpperCase() ?? "TOKEN";
+
+  const holderCount = detail?.summary?.holderCount ?? selectedSnap?.holderCount ?? 0;
+  const top10Pct = detail?.summary?.top10ConcentrationPct ?? selectedSnap?.top10ConcentrationPct ?? 0;
+  const capturedAt = detail?.summary?.capturedAt ?? selectedSnap?.capturedAt ?? null;
+  const topHolders = detail?.topHolders ?? [];
+
+  const noData = !loading && snapshots.length === 0;
+
   return (
     <div className="appShell" style={{ minHeight: "100vh" }}>
       <TopNavbar />
@@ -469,36 +627,60 @@ export function HolderAnalysisPage() {
           <div className="haHeader">
             <div className="haHeaderLeft">
               <h1 className="haTitle">Holder Analysis</h1>
-              <p className="haSubtitle">
-                Track whale wallets, holder distribution, and growth trends
-              </p>
+              <p className="haSubtitle">Track whale wallets, holder distribution, and growth trends</p>
             </div>
 
-            {/* Token selector */}
-            <button className="haTokenSelector" type="button" aria-label="Select token">
-              <span className="haTokenDot" />
-              BRETT
-              <ChevronDown size={15} />
-            </button>
+            <TokenSelector
+              snapshots={snapshots}
+              selected={selectedSnap}
+              tokenMeta={tokenMeta}
+              onSelect={setSelectedSnap}
+              loading={loading}
+            />
           </div>
 
           {/* Info banner */}
-          <div className="haBanner" role="alert">
-            <Info size={15} />
-            <span className="haBannerText">
-              <strong>Holder data requires on-chain indexing</strong> — connect
-              a full-node RPC to enable live holder tracking. Currently showing
-              estimated data.
-            </span>
-          </div>
+          {noData ? (
+            <div className="haBanner" role="alert">
+              <Info size={15} />
+              <span className="haBannerText">
+                <strong>No holder snapshots found.</strong> Run the holder indexer to populate data.
+              </span>
+            </div>
+          ) : !loading && top10Pct === 0 && holderCount === 0 ? (
+            <div className="haBanner" role="alert">
+              <Info size={15} />
+              <span className="haBannerText">
+                <strong>Holder data requires on-chain indexing.</strong> Connect a full-node RPC to enable live holder tracking.
+                {capturedAt && ` Last snapshot: ${timeAgo(capturedAt)}.`}
+              </span>
+            </div>
+          ) : null}
 
           {/* Stats strip */}
-          <StatsStrip />
+          <StatsStrip holderCount={holderCount} top10Pct={top10Pct} loading={loading || detailLoading} />
 
           {/* 3-column grid */}
           <div className="haGrid">
-            <DistributionPanel />
-            <TopHoldersPanel />
+            <div className="haPanel">
+              <div className="haPanelHeader">
+                <h2 className="haPanelTitle">
+                  <PieChartIcon size={14} />
+                  Holder Distribution
+                </h2>
+              </div>
+              <DistributionPanel top10Pct={top10Pct > 0 ? top10Pct : undefined} />
+            </div>
+
+            <TopHoldersPanel
+              topHolders={topHolders}
+              symbol={symbol}
+              loading={detailLoading}
+              capturedAt={capturedAt}
+              expanded={expandHolders}
+              setExpanded={setExpandHolders}
+            />
+
             <WhaleMovementsPanel />
           </div>
 

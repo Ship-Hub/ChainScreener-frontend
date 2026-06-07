@@ -343,16 +343,22 @@ function SkeletonTable() {
 // ─────────────────────────────────────────────────────────────
 // Detail panel
 // ─────────────────────────────────────────────────────────────
-function DetailPanel({ token }: { token: TokenSummary | null }) {
+function DetailPanel({
+  token,
+  watchlist,
+  onToggleWatchlist,
+}: {
+  token: TokenSummary | null;
+  watchlist: Set<string>;
+  onToggleWatchlist: (t: TokenSummary) => void;
+}) {
   const router = useRouter();
 
   if (!token) {
     return (
       <div className="rsRightPanel">
         <div className="rsDetailEmpty">
-          <div className="rsDetailEmptyIcon">
-            <Shield size={24} />
-          </div>
+          <div className="rsDetailEmptyIcon"><Shield size={24} /></div>
           <p className="rsDetailEmptyText">Select a token to view risk analysis</p>
         </div>
       </div>
@@ -363,15 +369,14 @@ function DetailPanel({ token }: { token: TokenSummary | null }) {
   const tone = tokenTone(token.symbol);
   const priceChangePos = token.priceChange24h >= 0;
   const lvl = token.riskLevel.toLowerCase() as "low" | "medium" | "high" | "extreme";
+  const wKey = `${token.chain}:${token.address}`;
+  const inWatchlist = watchlist.has(wKey);
 
   return (
     <div className="rsRightPanel">
       <div className="rsDetailPanel">
-        {/* Token header */}
         <div className="rsDetailHeader">
-          <div className={`rsDetailTokenLogo tone-${tone}`}>
-            {token.symbol.slice(0, 2).toUpperCase()}
-          </div>
+          <div className={`rsDetailTokenLogo tone-${tone}`}>{token.symbol.slice(0, 2).toUpperCase()}</div>
           <div className="rsDetailTokenInfo">
             <span className="rsDetailSymbol">{token.symbol}</span>
             <span className="rsDetailName">{token.name}</span>
@@ -384,21 +389,15 @@ function DetailPanel({ token }: { token: TokenSummary | null }) {
           </div>
         </div>
 
-        {/* Risk gauge */}
         <div className="rsDetailGauge">
           <span className="rsDetailGaugeLabel">Risk Score</span>
           <GaugeDonut score={token.riskScore} />
           <div className="rsDetailBadgeRow">
-            <span className={`rsRiskLevelBadge ${lvl}`}>
-              {token.riskLevel} Risk
-            </span>
-            <span className="chainBadge" style={{ textTransform: "uppercase", fontSize: 10 }}>
-              {token.chain}
-            </span>
+            <span className={`rsRiskLevelBadge ${lvl}`}>{token.riskLevel} Risk</span>
+            <span className="chainBadge" style={{ textTransform: "uppercase", fontSize: 10 }}>{token.chain}</span>
           </div>
         </div>
 
-        {/* Risk factors */}
         <div>
           <p className="rsSectionTitle">Risk Factors Breakdown</p>
           {factors.length === 0 ? (
@@ -407,9 +406,7 @@ function DetailPanel({ token }: { token: TokenSummary | null }) {
             <div className="rsFactorList">
               {factors.map((f, i) => (
                 <div key={i} className={`rsFactorRow ${f.severity}`}>
-                  <div className="rsFactorIcon">
-                    <FactorIcon severity={f.severity} />
-                  </div>
+                  <div className="rsFactorIcon"><FactorIcon severity={f.severity} /></div>
                   <div className="rsFactorText">
                     <span className="rsFactorLabel">{f.label}</span>
                     <span className="rsFactorDesc">{f.desc}</span>
@@ -420,7 +417,6 @@ function DetailPanel({ token }: { token: TokenSummary | null }) {
           )}
         </div>
 
-        {/* Quick actions */}
         <div>
           <p className="rsSectionTitle">Quick Actions</p>
           <div className="rsQuickActions">
@@ -429,16 +425,18 @@ function DetailPanel({ token }: { token: TokenSummary | null }) {
               type="button"
               onClick={() => router.push(`/token/${token.chain}/${token.address}`)}
             >
-              <Eye size={14} />
-              View Full Token Analysis
+              <Eye size={14} /> View Full Token Analysis
             </button>
-            <button className="rsActionBtn secondary" type="button">
-              <Star size={14} />
-              Add to Watchlist
+            <button
+              className={`rsActionBtn secondary ${inWatchlist ? "active" : ""}`}
+              type="button"
+              onClick={() => onToggleWatchlist(token)}
+            >
+              <Star size={14} fill={inWatchlist ? "currentColor" : "none"} />
+              {inWatchlist ? "In Watchlist ✓" : "Add to Watchlist"}
             </button>
             <button className="rsActionBtn disabled" type="button" disabled>
-              <Bell size={14} />
-              Set Alert (Coming Soon)
+              <Bell size={14} /> Set Alert (Coming Soon)
             </button>
           </div>
         </div>
@@ -474,6 +472,22 @@ export function RiskScannerPage() {
   const [selectedToken, setSelectedToken] = useState<TokenSummary | null>(null);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("All");
   const [scanTime, setScanTime] = useState("just now");
+  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    try { setWatchlist(new Set<string>(JSON.parse(localStorage.getItem("cs:watchlist") ?? "[]"))); }
+    catch {}
+  }, []);
+
+  const toggleWatchlist = (token: TokenSummary) => {
+    const key = `${token.chain}:${token.address}`;
+    setWatchlist(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      try { localStorage.setItem("cs:watchlist", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
 
   const load = async () => {
     setLoading(true);
@@ -528,10 +542,10 @@ export function RiskScannerPage() {
                 <h1 className="rsHeaderTitle">Risk Scanner</h1>
                 <p className="rsSubtitle">Real-time risk analysis across all tracked tokens</p>
               </div>
-              <div className="rsLastScan">
+              <button className="rsLastScan" type="button" onClick={() => void load()}>
                 <RefreshCw size={13} />
                 Last scan: {scanTime}
-              </div>
+              </button>
             </div>
 
             {/* Stat cards */}
@@ -721,7 +735,7 @@ export function RiskScannerPage() {
         </main>
 
         {/* Right detail panel */}
-        <DetailPanel token={selectedToken} />
+        <DetailPanel token={selectedToken} watchlist={watchlist} onToggleWatchlist={toggleWatchlist} />
       </div>
       <MobileBottomNav />
     </div>

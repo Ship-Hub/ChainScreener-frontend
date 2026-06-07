@@ -129,6 +129,10 @@ type LeaderEntry = {
 
 const logoPalette = ["cyan", "amber", "violet", "green", "rose", "blue"];
 
+const COMING_SOON = new Set([
+  "DEX Pools", "Liquidity Locks", "Contract Analyzer", "Opportunities", "Alerts", "Wallet Explorer",
+]);
+
 export function Dashboard({ initialTokens, initialTrending, initialLivePools, initialLiveSwaps, alertCount }: DashboardProps) {
   const router = useRouter();
   const [tokens, setTokens] = useState(initialTokens);
@@ -193,8 +197,6 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
     setRightPanel("watchlist");
     setActiveNav("Watchlist");
   }, []);
-
-  const COMING_SOON = new Set(["DEX Pools", "Liquidity Locks", "Contract Analyzer", "Opportunities", "Alerts", "Wallet Explorer"]);
 
   const handleNavClick = useCallback((label: string) => {
     if (label === "Launches")       { router.push("/launches");              return; }
@@ -967,6 +969,7 @@ function WatchlistPanel({ onClose }: { onClose: () => void }) {
 }
 
 function LatestLaunchesCard({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: (token: RadarToken) => void }) {
+  const router = useRouter();
   return (
     <section className="dataPanel latestLaunches">
       <PanelTitle icon={<Zap size={16} />} title="Latest Launches" />
@@ -997,12 +1000,19 @@ function LatestLaunchesCard({ tokens, onSelect }: { tokens: RadarToken[]; onSele
               <td>{money(token.marketCapUsd)}</td>
               <td>{money(token.volume24hUsd)}</td>
               <td><RiskBadge level={token.riskLevel} /></td>
-              <td><MiniSparkline tone={riskTone(token.riskLevel)} /></td>
+              <td>
+                {token.smartWalletBuys > 0
+                  ? <span className={`signalPill ${token.smartWalletBuys >= 12 ? "green" : "amber"}`}>
+                      {token.smartWalletBuys} wallet{token.smartWalletBuys !== 1 ? "s" : ""}
+                    </span>
+                  : <span style={{ color: "var(--faint)", fontSize: 11 }}>—</span>
+                }
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <button className="panelLink" type="button">View All Launches <ArrowRight size={15} /></button>
+      <button className="panelLink" type="button" onClick={() => router.push("/launches")}>View All Launches <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -1021,6 +1031,8 @@ function SmartMoneyFlowCard({ swaps }: { swaps: LiveSwap[] }) {
           const pair = t1 ? `${t0}/${t1}` : t0;
           const walletAddr = swap.sender ?? swap.txHash;
           const isFullAddr = /^0x[a-fA-F0-9]{40}$/.test(walletAddr);
+          // amount0Raw negative means token0 left the pool → user bought token0
+          const isBuy = swap.amount0Raw.startsWith("-");
           return (
             <div className="flowRow liveSwapRow" key={`${swap.chain}-${swap.txHash}-${swap.blockNumber}`}>
               <button
@@ -1032,7 +1044,7 @@ function SmartMoneyFlowCard({ swaps }: { swaps: LiveSwap[] }) {
               >
                 {shortAddress(walletAddr)}
               </button>
-              <b className="buy">{swap.protocolVersion.toUpperCase()}</b>
+              <b className={isBuy ? "buy" : "sell"}>{isBuy ? "BUY" : "SELL"}</b>
               <strong>{pair}</strong>
               <span>{swap.chain.toUpperCase()}</span>
               <a className="explorerLink muted" href={txUrl(swap.chain, swap.txHash)} target="_blank" rel="noopener noreferrer" title={swap.txHash}>
@@ -1046,7 +1058,7 @@ function SmartMoneyFlowCard({ swaps }: { swaps: LiveSwap[] }) {
           </div>
         )}
       </div>
-      <button className="panelLink" type="button">View All Activity <ArrowRight size={15} /></button>
+      <button className="panelLink" type="button" onClick={() => router.push("/smart-money")}>View All Activity <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -1231,13 +1243,6 @@ function MiniCandlestickChart({ token, candles: realCandles }: { token: RadarTok
   );
 }
 
-function MiniSparkline({ tone }: { tone: string }) {
-  return (
-    <svg className={`sparkline ${tone}`} viewBox="0 0 86 28" aria-hidden="true">
-      <polyline points="2,22 12,20 20,14 30,18 40,12 50,15 60,8 70,13 84,4" />
-    </svg>
-  );
-}
 
 function GaugeCard({ label, value, caption, tone }: { label: string; value: number; caption: string; tone: string }) {
   return (
@@ -1370,16 +1375,6 @@ function radarType(token: TokenSummary, index: number): RadarType {
   return "healthy";
 }
 
-function makeCandles(token: RadarToken) {
-  return Array.from({ length: 24 }, (_, index) => {
-    const wave = Math.sin((index + token.ticker.length) / 3) * 0.14;
-    const trend = token.priceChange24h >= 0 ? index * 0.018 : -index * 0.012;
-    const base = 1 + wave + trend;
-    const open = base + Math.cos(index) * 0.05;
-    const close = base + Math.sin(index * 1.7) * 0.06;
-    return { open, close, high: Math.max(open, close) + 0.08, low: Math.min(open, close) - 0.08, volume: Math.abs(Math.sin(index * 0.9)) + 0.2 };
-  });
-}
 
 function buyerPressure(token: RadarToken) {
   const total = token.buyers + token.sellers;

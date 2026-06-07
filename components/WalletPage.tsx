@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { MobileBottomNav } from "./MobileBottomNav";
 import {
@@ -26,7 +26,6 @@ import {
   Radar,
   CircleDollarSign,
   MoreHorizontal,
-  ChevronDown,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -78,6 +77,30 @@ type WalletHolding = {
   priceChange24h: number;
 };
 
+type FundingEdge = {
+  chain: string;
+  fromAddress: string;
+  toAddress: string;
+  tokenAddress: string;
+  amountRaw: string;
+  transferCount: number;
+  confidence: number;
+  firstSeenBlock: number;
+  lastSeenBlock: number;
+};
+
+type FundingAnalysis = {
+  address: string;
+  incoming: FundingEdge[];
+  outgoing: FundingEdge[];
+  likelyFunders: FundingEdge[];
+  likelyFundedWallets: FundingEdge[];
+};
+
+type GraphNode = { id: string; label: string; type: string; weight: number };
+type GraphEdge = { from: string; to: string; type: string; weight: number; confidence?: number };
+type WalletGraphData = { address: string; nodes: GraphNode[]; edges: GraphEdge[] };
+
 // ── Static display helpers ─────────────────────────────────────────────────────
 
 const scoreBars = [
@@ -88,14 +111,17 @@ const scoreBars = [
   { label: "Consistency", value: 0 },
 ];
 
-const connectedWallets = [
-  { addr: "0x5e21...9d4a", emoji: "🦊", angle: 0 },
-  { addr: "0x9a3b...7c1d", emoji: "🐋", angle: 60 },
-  { addr: "0x1f32...aa11", emoji: "🎯", angle: 120 },
-  { addr: "0x8e77...2b1f", emoji: "⚡", angle: 180 },
-  { addr: "0x4ab3...9f2d", emoji: "💎", angle: 240 },
-  { addr: "0x12d1...c3a2", emoji: "🔮", angle: 300 },
-];
+const GRAPH_ANGLES = [0, 60, 120, 180, 240, 300];
+
+const TIMEFRAME_DAYS: Record<string, number> = {
+  "7D": 7, "30D": 30, "90D": 90, "180D": 180, "1Y": 365, "All": Infinity,
+};
+
+function graphNodeEmoji(type: string): string {
+  if (type === "funding") return "💸";
+  if (type === "co-trader") return "🤝";
+  return "🦊";
+}
 
 const copySimRows = [
   { period: "30 Days", ret: "—", spark: [10, 18, 14, 22, 28, 25, 42] },
@@ -110,6 +136,16 @@ const similarWallets = [
 ];
 
 // ── Formatting helpers ─────────────────────────────────────────────────────────
+
+function explorerRoot(chain: string): string {
+  if (chain === "base") return "https://basescan.org";
+  if (chain === "eth") return "https://etherscan.io";
+  return "https://bscscan.com";
+}
+
+function explorerTx(chain: string, hash: string): string {
+  return `${explorerRoot(chain)}/tx/${hash}`;
+}
 
 function fmtUsd(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
@@ -250,6 +286,8 @@ export default function WalletPage({ address }: WalletPageProps) {
   const [stats, setStats] = useState<WalletStats | null>(null);
   const [holdings, setHoldings] = useState<WalletHolding[]>([]);
   const [loading, setLoading] = useState(true);
+  const [funding, setFunding] = useState<FundingAnalysis | null>(null);
+  const [graph, setGraph] = useState<WalletGraphData | null>(null);
 
   const shortAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -263,14 +301,36 @@ export default function WalletPage({ address }: WalletPageProps) {
       fetch(`${api}/api/wallets/${address}/trades?limit=50`).then(r => r.json()).then(d => setTrades(d.data ?? [])),
       fetch(`${api}/api/wallets/${address}/stats`).then(r => r.json()).then(d => setStats(d.data ?? null)),
       fetch(`${api}/api/wallets/${address}/holdings`).then(r => r.json()).then(d => setHoldings(d.data ?? [])),
+      fetch(`${api}/api/wallets/${address}/funding`).then(r => r.json()).then(d => setFunding(d.data ?? null)).catch(() => {}),
+      fetch(`${api}/api/wallets/${address}/graph`).then(r => r.json()).then(d => setGraph(d.data ?? null)).catch(() => {}),
     ]).catch(() => {}).finally(() => setLoading(false));
   }, [address]);
 
-  // Derive equity curve from cumulative trade volumes over time
-  const equityData = (() => {
-    if (trades.length === 0) return [{ month: "—", value: 0 }];
+  const handleNavClick = useCallback((label: string) => {
+    if (label === "Radar")           { router.push("/");                        return; }
+    if (label === "Launches")        { router.push("/launches");                return; }
+    if (label === "Smart Money")     { router.push("/smart-money");             return; }
+    if (label === "Top Gainers")     { router.push("/top-gainers");             return; }
+    if (label === "Top Volume")      { router.push("/top-gainers?sort=volume"); return; }
+    if (label === "Holder Analysis") { router.push("/holder-analysis");         return; }
+    if (label === "Risk Scanner")    { router.push("/risk-scanner");            return; }
+    if (label === "Settings")        { router.push("/settings");                return; }
+    // Wallet Explorer = current page; others coming soon
+  }, [router]);
+
+  // Filter trades by selected timeframe before building equity curve
+  const filteredTrades = useMemo(() => {
+    const days = TIMEFRAME_DAYS[activeTimeframe] ?? Infinity;
+    if (!isFinite(days)) return trades;
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return trades.filter(t => new Date(t.occurredAt).getTime() >= cutoff);
+  }, [trades, activeTimeframe]);
+
+  // Derive equity curve from cumulative trade volumes over filtered time window
+  const equityData = useMemo(() => {
+    if (filteredTrades.length === 0) return [{ month: "—", value: 0 }];
     const byMonth = new Map<string, number>();
-    for (const t of [...trades].reverse()) {
+    for (const t of [...filteredTrades].reverse()) {
       const d = new Date(t.occurredAt);
       const key = `${d.toLocaleString("default", { month: "short" })} '${String(d.getFullYear()).slice(2)}`;
       byMonth.set(key, (byMonth.get(key) ?? 0) + t.valueUsd);
@@ -280,9 +340,9 @@ export default function WalletPage({ address }: WalletPageProps) {
       running += v;
       return { month, value: Math.round(running) };
     });
-  })();
+  }, [filteredTrades]);
 
-  const totalVolumeUsd = stats?.totalVolumeUsd ?? trades.reduce((s, t) => s + t.valueUsd, 0);
+  const totalVolumeUsd = stats?.totalVolumeUsd ?? filteredTrades.reduce((s, t) => s + t.valueUsd, 0);
   const totalHoldingsUsd = holdings.reduce((s, h) => s + h.valueUsd, 0);
 
   // Score bars: real quality signals once computeSmartWallets has run
@@ -306,7 +366,7 @@ export default function WalletPage({ address }: WalletPageProps) {
       <nav className="wpSidebar">
         <div className="wpNavGroup">
           {NAV_ITEMS.map((item) => (
-            <button key={item.label} className="wpNavItem">
+            <button key={item.label} className="wpNavItem" onClick={() => handleNavClick(item.label)}>
               {item.icon}
               <span className="wpNavItemLabel">{item.label}</span>
             </button>
@@ -321,6 +381,7 @@ export default function WalletPage({ address }: WalletPageProps) {
             <button
               key={item.label}
               className={`wpNavItem${item.active ? " active" : ""}`}
+              onClick={() => handleNavClick(item.label)}
             >
               {item.icon}
               <span className="wpNavItemLabel">{item.label}</span>
@@ -333,7 +394,7 @@ export default function WalletPage({ address }: WalletPageProps) {
         <div className="wpNavSection">Tools</div>
         <div className="wpNavGroup">
           {TOOLS_ITEMS.map((item) => (
-            <button key={item.label} className="wpNavItem">
+            <button key={item.label} className="wpNavItem" onClick={() => handleNavClick(item.label)}>
               {item.icon}
               <span className="wpNavItemLabel">{item.label}</span>
             </button>
@@ -345,7 +406,7 @@ export default function WalletPage({ address }: WalletPageProps) {
         <div className="wpNavSection">Settings</div>
         <div className="wpNavGroup">
           {SETTINGS_ITEMS.map((item) => (
-            <button key={item.label} className="wpNavItem">
+            <button key={item.label} className="wpNavItem" onClick={() => handleNavClick(item.label)}>
               {item.icon}
               <span className="wpNavItemLabel">{item.label}</span>
             </button>
@@ -390,7 +451,6 @@ export default function WalletPage({ address }: WalletPageProps) {
             <button className="wpAlertBtn">
               <Bell size={14} />
               Alerts
-              <span className="wpAlertBadge">12</span>
             </button>
             <button className="wpWatchlistBtn">
               <Star size={14} />
@@ -433,7 +493,7 @@ export default function WalletPage({ address }: WalletPageProps) {
                           {copied ? <Check size={13} /> : <Copy size={13} />}
                         </button>
                         <a
-                          href={`https://basescan.org/address/${shortAddress}`}
+                          href={`${explorerRoot(trades[0]?.chain ?? "eth")}/address/${address}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="wpCopyBtn"
@@ -443,8 +503,10 @@ export default function WalletPage({ address }: WalletPageProps) {
                         </a>
                       </div>
                       <div className="wpBadgeRow">
-                        <span className="wpBadge cyan">Smart Wallet</span>
-                        <span className="wpBadge amber">Elite Tier</span>
+                        {(stats?.score ?? 0) >= 50 && <span className="wpBadge cyan">Smart Wallet</span>}
+                        {(stats?.score ?? 0) >= 80 && <span className="wpBadge amber">Elite Tier</span>}
+                        {(stats?.score ?? 0) > 0 && (stats?.score ?? 0) < 50 && <span className="wpBadge blue">Tracked Wallet</span>}
+                        {!stats && <span className="wpBadge blue">Loading…</span>}
                       </div>
                     </div>
                   </div>
@@ -518,10 +580,12 @@ export default function WalletPage({ address }: WalletPageProps) {
                   <div className="wpTierCrown">
                     <Gem size={20} />
                   </div>
-                  <div className="wpTierName">Elite</div>
+                  <div className="wpTierName">
+                    {(stats?.score ?? 0) >= 80 ? "Elite" : (stats?.score ?? 0) >= 50 ? "Pro" : (stats?.score ?? 0) > 0 ? "Tracked" : "—"}
+                  </div>
                   <div className="wpTierSub">
-                    <span className="wpTierRank">Rank #1,248</span>
-                    <span className="wpTierPct">Top 2.3%</span>
+                    <span className="wpTierRank">Score {stats?.score ?? "—"}</span>
+                    <span className="wpTierPct">/ 100</span>
                   </div>
                 </div>
               </div>
@@ -607,10 +671,6 @@ export default function WalletPage({ address }: WalletPageProps) {
               <div className="wpHoldingsCard">
                 <div className="wpCardHeader">
                   <span className="wpCardTitle">Current Holdings ({holdings.length})</span>
-                  <button className="wpViewAllBtn">
-                    View All
-                    <ChevronDown size={12} />
-                  </button>
                 </div>
                 <table className="wpTable">
                   <thead>
@@ -764,16 +824,14 @@ export default function WalletPage({ address }: WalletPageProps) {
                       <th>Chain</th>
                       <th>Value (USD)</th>
                       <th>Price</th>
-                      <th>MCap at Time</th>
-                      <th>P&L (USD)</th>
-                      <th>ROI</th>
+                      <th>Tx</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={9} style={{ color: "oklch(0.52 0.032 248)", textAlign: "center" }}>Loading…</td></tr>
+                      <tr><td colSpan={7} style={{ color: "oklch(0.52 0.032 248)", textAlign: "center" }}>Loading…</td></tr>
                     ) : trades.length === 0 ? (
-                      <tr><td colSpan={9} style={{ color: "oklch(0.52 0.032 248)", textAlign: "center" }}>No trades found for this wallet</td></tr>
+                      <tr><td colSpan={7} style={{ color: "oklch(0.52 0.032 248)", textAlign: "center" }}>No trades found for this wallet</td></tr>
                     ) : trades.map((t, i) => (
                       <tr
                         key={`${t.txHash}-${i}`}
@@ -795,15 +853,27 @@ export default function WalletPage({ address }: WalletPageProps) {
                         </td>
                         <td style={{ fontWeight: 600 }}>{fmtUsd(t.valueUsd)}</td>
                         <td>{fmtPrice(t.priceUsd)}</td>
-                        <td className="wpMuted">—</td>
-                        <td className="wpMuted">—</td>
-                        <td className="wpMuted">—</td>
+                        <td>
+                          <a
+                            className="wpCopyBtn"
+                            href={explorerTx(t.chain, t.txHash)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={t.txHash}
+                          >
+                            <ExternalLink size={12} />
+                          </a>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <button className="wpViewAllLink">View All Transactions →</button>
+              {trades.length >= 50 && (
+                <div style={{ padding: "8px 16px", fontSize: 11, color: "var(--faint)", textAlign: "center" }}>
+                  Showing latest 50 trades — increase limit via API for full history
+                </div>
+              )}
             </div>
           </main>
 
@@ -835,79 +905,121 @@ export default function WalletPage({ address }: WalletPageProps) {
             <div className="wpRightSection">
               <div className="wpRightSectionTitle">Funding Analysis</div>
               <div className="wpFundingCard">
-                <div className="wpFundingRow">
-                  <span className="wpFundingLabel">Funded by</span>
-                  <span className="wpFundingAddr">0x4ab3...9f2d</span>
-                </div>
-                <div className="wpFundingRow">
-                  <span className="wpFundingLabel">4 months ago</span>
-                  <span className="wpFundingVal" style={{ color: "oklch(0.52 0.032 248)" }}>
-                    May 2025
-                  </span>
-                </div>
-                <div className="wpFundingRow">
-                  <span className="wpFundingLabel">Value at time</span>
-                  <span className="wpFundingVal">$12,500</span>
-                </div>
-                <div className="wpFundingRow">
-                  <span className="wpFundingLabel">Total received</span>
-                  <span className="wpFundingVal">$12,500</span>
-                </div>
+                {funding === null ? (
+                  <div style={{ color: "var(--faint)", fontSize: 12, padding: "8px 0", textAlign: "center" }}>Loading…</div>
+                ) : funding.likelyFunders.length === 0 && funding.likelyFundedWallets.length === 0 ? (
+                  <div style={{ color: "var(--faint)", fontSize: 12, padding: "8px 0", textAlign: "center" }}>No funding edges indexed yet</div>
+                ) : (
+                  <>
+                    {funding.likelyFunders.slice(0, 3).map((f, i) => (
+                      <div key={i} style={{ paddingBottom: i < Math.min(funding.likelyFunders.length, 3) - 1 ? 10 : 0, marginBottom: i < Math.min(funding.likelyFunders.length, 3) - 1 ? 10 : 0, borderBottom: i < Math.min(funding.likelyFunders.length, 3) - 1 ? "1px solid var(--line-soft)" : "none" }}>
+                        <div className="wpFundingRow">
+                          <span className="wpFundingLabel">Funded by</span>
+                          <span className="wpFundingAddr">{f.fromAddress.slice(0, 6)}…{f.fromAddress.slice(-4)}</span>
+                        </div>
+                        <div className="wpFundingRow">
+                          <span className="wpFundingLabel">Chain</span>
+                          <span className="wpFundingVal">{f.chain.toUpperCase()}</span>
+                        </div>
+                        <div className="wpFundingRow">
+                          <span className="wpFundingLabel">Transfers</span>
+                          <span className="wpFundingVal">{f.transferCount}</span>
+                        </div>
+                        <div className="wpFundingRow">
+                          <span className="wpFundingLabel">Confidence</span>
+                          <span className="wpFundingVal">{(Number(f.confidence) * 100).toFixed(0)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                    {funding.likelyFundedWallets.length > 0 && (
+                      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line-soft)" }}>
+                        <div className="wpFundingLabel" style={{ marginBottom: 6, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                          Also funds ({funding.likelyFundedWallets.length})
+                        </div>
+                        {funding.likelyFundedWallets.slice(0, 3).map((f, i) => (
+                          <div key={i} className="wpFundingRow">
+                            <span className="wpFundingAddr">{f.toAddress.slice(0, 6)}…{f.toAddress.slice(-4)}</span>
+                            <span className="wpFundingVal" style={{ color: "var(--faint)" }}>{f.chain.toUpperCase()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
             {/* Connected Wallets */}
             <div className="wpRightSection">
-              <div className="wpRightSectionTitle">Connected Wallets (7)</div>
-              <div className="wpGraphCard">
-                <div className="wpGraphViz" suppressHydrationWarning>
-                  {/* Lines — use node.angle directly; avoids atan2 float divergence between SSR/client */}
-                  {connectedWallets.map((node, i) => (
-                    <div
-                      key={i}
-                      className="wpGraphLine"
-                      suppressHydrationWarning
-                      style={{
-                        width: "62px",
-                        transform: `translateY(-50%) rotate(${node.angle}deg)`,
-                        left: "50%",
-                        top: "50%",
-                      }}
-                    />
-                  ))}
-
-                  {/* Center node */}
-                  <div className="wpGraphCenter">🦊</div>
-
-                  {/* Surrounding nodes — pre-compute positions with rounded values */}
-                  {connectedWallets.map((node, i) => {
-                    const rad = (node.angle * Math.PI) / 180;
-                    const r = 62;
-                    // Round to 2dp so SSR and client always agree
-                    const nx = parseFloat((50 + (r / 160) * 100 * Math.cos(rad)).toFixed(2));
-                    const ny = parseFloat((50 + (r / 160) * 100 * Math.sin(rad)).toFixed(2));
-                    return (
-                      <div
-                        key={i}
-                        className="wpGraphNode"
-                        style={{ left: `${nx}%`, top: `${ny}%` }}
-                      >
-                        <div className="wpGraphNodeDot">{node.emoji}</div>
-                        <span className="wpGraphNodeLabel">{node.addr}</span>
+              {(() => {
+                const connectedNodes = graph
+                  ? graph.nodes.filter(n => n.id !== address.toLowerCase()).slice(0, 6)
+                  : [];
+                const totalConnected = graph ? graph.nodes.length - 1 : 0;
+                return (
+                  <>
+                    <div className="wpRightSectionTitle">
+                      Connected Wallets ({graph ? totalConnected : "…"})
+                    </div>
+                    <div className="wpGraphCard">
+                      <div className="wpGraphViz" suppressHydrationWarning>
+                        {connectedNodes.map((node, i) => (
+                          <div
+                            key={i}
+                            className="wpGraphLine"
+                            suppressHydrationWarning
+                            style={{
+                              width: "62px",
+                              transform: `translateY(-50%) rotate(${GRAPH_ANGLES[i] ?? 0}deg)`,
+                              left: "50%",
+                              top: "50%",
+                            }}
+                          />
+                        ))}
+                        <div className="wpGraphCenter">🦊</div>
+                        {connectedNodes.map((node, i) => {
+                          const rad = ((GRAPH_ANGLES[i] ?? 0) * Math.PI) / 180;
+                          const r = 62;
+                          const nx = parseFloat((50 + (r / 160) * 100 * Math.cos(rad)).toFixed(2));
+                          const ny = parseFloat((50 + (r / 160) * 100 * Math.sin(rad)).toFixed(2));
+                          return (
+                            <div
+                              key={i}
+                              className="wpGraphNode"
+                              style={{ left: `${nx}%`, top: `${ny}%` }}
+                            >
+                              <div className="wpGraphNodeDot">{graphNodeEmoji(node.type)}</div>
+                              <span className="wpGraphNodeLabel">{node.label}</span>
+                            </div>
+                          );
+                        })}
+                        {graph === null && (
+                          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--faint)", fontSize: 11 }}>
+                            Loading…
+                          </div>
+                        )}
+                        {graph !== null && connectedNodes.length === 0 && (
+                          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "var(--faint)", fontSize: 11 }}>
+                            No connections found
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-                <a href="#" className="wpGraphLink">
-                  View Full Graph
-                  <ExternalLink size={11} style={{ marginLeft: 4 }} />
-                </a>
-              </div>
+                      <button type="button" className="wpGraphLink" onClick={() => router.push(`/wallet/${address}`)}>
+                        View Full Graph
+                        <ExternalLink size={11} style={{ marginLeft: 4 }} />
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* If You Copied This Wallet */}
             <div className="wpRightSection">
-              <div className="wpRightSectionTitle">If You Copied This Wallet</div>
+              <div className="wpRightSectionTitle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                If You Copied This Wallet
+                <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "oklch(0.55 0.15 80 / 0.15)", color: "oklch(0.82 0.18 80)", border: "1px solid oklch(0.55 0.15 80 / 0.35)" }}>Demo</span>
+              </div>
               <div className="wpCopySection">
                 {copySimRows.map((row) => (
                   <div key={row.period} className="wpCopyRow">
@@ -923,7 +1035,10 @@ export default function WalletPage({ address }: WalletPageProps) {
 
             {/* Similar Wallets */}
             <div className="wpRightSection">
-              <div className="wpRightSectionTitle">Similar Wallets</div>
+              <div className="wpRightSectionTitle" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                Similar Wallets
+                <span style={{ fontSize: 9, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "oklch(0.55 0.15 80 / 0.15)", color: "oklch(0.82 0.18 80)", border: "1px solid oklch(0.55 0.15 80 / 0.35)" }}>Demo</span>
+              </div>
               <div className="wpSimilarList">
                 {similarWallets.map((w) => (
                   <div key={w.addr} className="wpSimilarRow">

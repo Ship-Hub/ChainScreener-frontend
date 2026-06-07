@@ -141,14 +141,13 @@ export function TokenPage({ token }: Props) {
 
   const explorer = chainExplorer(token.chain);
 
-  const { quoteSymbol, quotePriceUsd, pairLabel, dexLabel, firstSwapAge } = useMemo(() => {
-    if (!swaps.length) return { quoteSymbol: "—", quotePriceUsd: 0, pairLabel: `${token.symbol} / —`, dexLabel: "DEX", firstSwapAge: "—" };
+  const { quoteSymbol, quotePriceUsd, pairLabel, dexLabel } = useMemo(() => {
+    if (!swaps.length) return { quoteSymbol: "—", quotePriceUsd: 0, pairLabel: `${token.symbol} / —`, dexLabel: token.dex || "DEX" };
     const s = swaps[swaps.length - 1];
     const isToken0 = s.token0.toLowerCase() === token.address.toLowerCase();
     const qSym = isToken0 ? s.token1Symbol : s.token0Symbol;
     const qPrice = isToken0 ? s.token1PriceUsd : s.token0PriceUsd;
-    const oldest = swaps.reduce((a, b) => new Date(a.observedAt) < new Date(b.observedAt) ? a : b);
-    return { quoteSymbol: qSym, quotePriceUsd: qPrice, pairLabel: `${token.symbol} / ${qSym}`, dexLabel: s.dexName, firstSwapAge: timeAgo(oldest.observedAt) };
+    return { quoteSymbol: qSym, quotePriceUsd: qPrice, pairLabel: `${token.symbol} / ${qSym}`, dexLabel: s.dexName };
   }, [swaps, token]);
 
   const swapStats = useMemo(() => {
@@ -281,6 +280,9 @@ export function TokenPage({ token }: Props) {
               <div className="tpTokenMeta">
                 <div className="tpTokenNameRow">
                   <span className="tpTokenName">{token.symbol}</span>
+                  {token.name && token.name !== token.symbol && (
+                    <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 400, marginLeft: 6 }}>{token.name}</span>
+                  )}
                   <button type="button" className="tpIconMini" onClick={copyAddress} title="Copy address">
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                   </button>
@@ -308,7 +310,7 @@ export function TokenPage({ token }: Props) {
             <div className="tpGauges">
               <GaugeWidget label="Risk Score" value={riskScore} max={100} caption={riskLevelLabel} tone={riskScore < 40 ? "green" : riskScore < 65 ? "amber" : "red"} suffix="/100" />
               <GaugeWidget label="Buyer Pressure" value={buyerPressure} max={100} caption={pressureLabel} tone={buyerPressure >= 55 ? "green" : "amber"} suffix="%" />
-              <SmartMoneyWidget label="Smart Money Interest" value="Building" detail={`${token.buys24h} wallets`} />
+              <SmartMoneyWidget label="Buy Activity (24H)" value={token.buys24h > 0 ? `${token.buys24h} buys` : "—"} detail={`${token.sells24h} sells · ${token.swaps24h} total`} />
             </div>
           </div>
 
@@ -318,8 +320,8 @@ export function TokenPage({ token }: Props) {
             <StatChip label="Volume (24H)" value={money(token.volume24hUsd)} trend="up" />
             <StatChip label="Liquidity" value={token.liquidityUsd > 0 ? money(token.liquidityUsd) : "—"} />
             <StatChip label="Holders" value="—" note="indexer pending" />
-            <StatChip label="Age" value={firstSwapAge} />
-            <StatChip label="FDV" value={token.totalSupply && token.marketCapUsd > 0 ? money(token.marketCapUsd) : "—"} />
+            <StatChip label="Age" value={token.ageMinutes > 0 ? formatAge(token.ageMinutes) : "—"} />
+            <StatChip label="FDV" value="—" note="not available" />
           </div>
         </div>
 
@@ -493,7 +495,7 @@ export function TokenPage({ token }: Props) {
                 <span className="tpSupply tpMuted">—</span>
               </OverviewRow>
               <OverviewRow label="Launch Source"><span className="tpMuted">{token.launchSource}</span></OverviewRow>
-              <OverviewRow label="First Swap"><span className="tpMuted">{firstSwapAge}</span></OverviewRow>
+              <OverviewRow label="Token Age"><span className="tpMuted">{token.ageMinutes > 0 ? formatAge(token.ageMinutes) : "—"}</span></OverviewRow>
               <OverviewRow label="Chain">
                 <span className={`tpChainTag sm ${token.chain}`}>{chainLabel(token.chain)}</span>
               </OverviewRow>
@@ -750,12 +752,24 @@ function fmtAmt(n: number) {
 
 function fmtSupply(totalSupply: string, decimals: number, symbol: string) {
   try {
-    const n = Number(BigInt(totalSupply)) / 10 ** decimals;
+    // String-based decimal shift — avoids BigInt literal and Number precision loss
+    const raw = totalSupply.replace(/\D/g, "");
+    const len = raw.length;
+    const n = len <= decimals
+      ? parseFloat("0." + raw.padStart(decimals, "0"))
+      : parseFloat(raw.slice(0, len - decimals) + "." + raw.slice(len - decimals));
+    if (!isFinite(n) || n < 0) return "—";
     if (n >= 1e9) return `${(n / 1e9).toFixed(0)}B ${symbol}`;
     if (n >= 1e6) return `${(n / 1e6).toFixed(0)}M ${symbol}`;
     if (n >= 1000) return `${(n / 1000).toFixed(0)}K ${symbol}`;
     return `${n.toFixed(0)} ${symbol}`;
   } catch { return "—"; }
+}
+
+function formatAge(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return `${Math.floor(minutes / 1440)}d`;
 }
 
 function timeAgo(iso: string) {
