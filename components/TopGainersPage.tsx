@@ -28,9 +28,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import "../app/top-gainers/top-gainers.css";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { dispatchNavStart } from "./NavigationProgress";
 
 // ── Shared API type ───────────────────────────────────────────
 interface TokenSummary {
@@ -288,6 +289,18 @@ function TopNavbar() {
 // ─────────────────────────────────────────────────────────────
 function TgSidebar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+
+  useEffect(() => { setPendingRoute(null); }, [pathname]);
+
+  const navigate = (route: string) => {
+    if (pendingRoute) return;
+    setPendingRoute(route);
+    dispatchNavStart();
+    router.push(route);
+  };
+
   return (
     <aside className="tgSidebar">
       <nav aria-label="Top Gainers navigation">
@@ -298,13 +311,15 @@ function TgSidebar() {
             ) : null}
             {section.items.map((item) => {
               const Icon = item.icon;
-              const isActive = Boolean(item.active);
+              const isActive  = Boolean(item.active);
+              const isPending = pendingRoute === item.route;
               return (
                 <button
-                  className={`sideNavItem ${isActive ? "active" : ""}`}
+                  className={`sideNavItem${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
                   key={item.label}
                   type="button"
-                  onClick={() => router.push(item.route)}
+                  aria-busy={isPending || undefined}
+                  onClick={() => navigate(item.route)}
                 >
                   <Icon size={16} />
                   <span>{item.label}</span>
@@ -386,7 +401,7 @@ function TopGainersTable({
               const key = `g-${row.rank}`;
               const isPos = row.change.startsWith("+");
               return (
-                <tr key={row.rank} onClick={() => router.push(`/token/${row.chain}/${row.address}`)}>
+                <tr key={row.rank} onClick={() => { dispatchNavStart(); router.push(`/token/${row.chain}/${row.address}`); }}>
                   <td><span className="tgRank">{row.rank}</span></td>
                   <td>
                     <button
@@ -485,7 +500,7 @@ function TopVolumeTable({
             ) : displayed.map((row) => {
               const key = `v-${row.rank}`;
               return (
-                <tr key={row.rank} onClick={() => router.push(`/token/${row.chain}/${row.address}`)}>
+                <tr key={row.rank} onClick={() => { dispatchNavStart(); router.push(`/token/${row.chain}/${row.address}`); }}>
                   <td><span className="tgRank">{row.rank}</span></td>
                   <td>
                     <button

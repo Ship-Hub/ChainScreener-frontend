@@ -31,10 +31,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import "../app/launches/launches.css";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { dispatchNavStart } from "./NavigationProgress";
 
 // ── Shared types from market API ──────────────────────────────
 interface TokenSummary {
@@ -366,6 +367,17 @@ function TopNavbar({
 
 function Sidebar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+
+  useEffect(() => { setPendingRoute(null); }, [pathname]);
+
+  const navigate = (route: string) => {
+    if (pendingRoute) return;
+    setPendingRoute(route);
+    dispatchNavStart();
+    router.push(route);
+  };
 
   return (
     <aside className="sidebar">
@@ -377,14 +389,16 @@ function Sidebar() {
             ) : null}
             {section.items.map((item) => {
               const Icon = item.icon;
-              const isActive = "active" in item && item.active;
+              const isActive  = "active" in item && item.active;
+              const isPending = "route" in item && pendingRoute === item.route;
               return (
                 <button
-                  className={`sideNavItem ${isActive ? "active" : ""}`}
+                  className={`sideNavItem${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
                   key={item.label}
                   type="button"
+                  aria-busy={isPending || undefined}
                   onClick={() => {
-                    if ("route" in item && item.route) router.push(item.route);
+                    if ("route" in item && item.route) navigate(item.route);
                   }}
                 >
                   <Icon size={16} />
@@ -1283,8 +1297,8 @@ export function LaunchesPage() {
     avgAgeMinutes: rawTokens.length > 0 ? Math.round(rawTokens.reduce((s, t) => s + t.ageMinutes, 0) / rawTokens.length) : 0,
   };
 
-  const handleRowClick = (token: TokenLaunch) => router.push(`/token/${token.chain}/${token.address}`);
-  const handlePlatformTokenClick = (address: string, chain: string) => router.push(`/token/${chain}/${address}`);
+  const handleRowClick = (token: TokenLaunch) => { dispatchNavStart(); router.push(`/token/${token.chain}/${token.address}`); };
+  const handlePlatformTokenClick = (address: string, chain: string) => { dispatchNavStart(); router.push(`/token/${chain}/${address}`); };
 
   const updateFilter = useCallback((partial: Partial<FilterState>) => {
     setFilterState(prev => ({ ...prev, ...partial }));

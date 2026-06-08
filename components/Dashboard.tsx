@@ -37,10 +37,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { dispatchNavStart } from "./NavigationProgress";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import type { Candle, ChainKey, LivePool, LiveSwap, RiskLevel, TokenSummary } from "../lib/types";
-import { fetchLiveData, fetchTokenCandles, fetchTokenSwaps } from "../lib/api";
+import { fetchLiveData, fetchTokenCandles, fetchTokenSwaps, subscribeLiveFeed } from "../lib/api";
 import { MobileBottomNav } from "./MobileBottomNav";
 
 type DashboardProps = {
@@ -135,6 +136,7 @@ const COMING_SOON = new Set([
 
 export function Dashboard({ initialTokens, initialTrending, initialLivePools, initialLiveSwaps, alertCount }: DashboardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [tokens, setTokens] = useState(initialTokens);
   const [livePools, setLivePools] = useState(initialLivePools);
   const [liveSwaps, setLiveSwaps] = useState(initialLiveSwaps);
@@ -146,12 +148,17 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   const [rightPanel, setRightPanel] = useState<RightPanel>("token");
   const [activeNav, setActiveNav] = useState("Radar");
   const [comingSoonLabel, setComingSoonLabel] = useState("");
+  // Tracks which sidebar item is mid-navigation so we can show a pending state
+  const [pendingNav, setPendingNav] = useState<string | null>(null);
 
   // Starred tokens — persisted to localStorage
   const [starred, setStarred] = useState<Record<string, boolean>>({});
   useEffect(() => {
     try { const s = localStorage.getItem("cs:starred"); if (s) setStarred(JSON.parse(s)); } catch {}
   }, []);
+
+  // Clear the sidebar loading indicator once the new route has mounted
+  useEffect(() => { setPendingNav(null); }, [pathname]);
   const toggleStar = useCallback((id: string) => {
     setStarred(prev => {
       const next = { ...prev, [id]: !prev[id] };
@@ -160,24 +167,52 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
     });
   }, []);
 
-  // Polling — respects live flag and speed
-  const liveRef = useRef(live);
-  useEffect(() => { liveRef.current = live; }, [live]);
-
   useEffect(() => {
+    if (!live) return;
+
     let active = true;
+    let streamHealthy = false;
+
+    const applyLiveData = ({
+      tokens: nextTokens,
+      livePools: nextPools,
+      liveSwaps: nextSwaps,
+    }: {
+      tokens: TokenSummary[];
+      livePools: LivePool[];
+      liveSwaps: LiveSwap[];
+    }) => {
+      if (!active) return;
+      if (nextTokens.length) setTokens(nextTokens);
+      if (nextPools.length) setLivePools(nextPools);
+      if (nextSwaps.length) setLiveSwaps(nextSwaps);
+    };
+
+    const unsubscribe = subscribeLiveFeed(
+      (snapshot) => {
+        streamHealthy = true;
+        applyLiveData(snapshot);
+      },
+      () => {
+        streamHealthy = false;
+      },
+    );
+
     const poll = () => {
-      if (!liveRef.current) return;
+      if (streamHealthy) return;
       fetchLiveData().then(({ tokens: t, livePools: p, liveSwaps: s }) => {
-        if (!active) return;
-        if (t.length) setTokens(t);
-        if (p.length) setLivePools(p);
-        if (s.length) setLiveSwaps(s);
+        applyLiveData({ tokens: t, livePools: p, liveSwaps: s });
       });
     };
+
+    poll();
     const id = setInterval(poll, Math.round(15_000 / speed));
-    return () => { active = false; clearInterval(id); };
-  }, [speed]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      active = false;
+      clearInterval(id);
+      unsubscribe();
+    };
+  }, [live, speed]);
 
   const radarTokens = useMemo(() => enrichTokens(tokens), [tokens]);
   const trendingTokens = useMemo(() => enrichTokens(tokens.length ? tokens : initialTrending), [tokens, initialTrending]);
@@ -190,6 +225,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   }, []);
 
   const openTokenPage = useCallback((token: RadarToken) => {
+    dispatchNavStart();
     router.push(`/token/${token.chain}/${token.address}`);
   }, [router]);
 
@@ -199,12 +235,20 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   }, []);
 
   const handleNavClick = useCallback((label: string) => {
-    if (label === "Launches")       { router.push("/launches");              return; }
-    if (label === "Smart Money")    { router.push("/smart-money");           return; }
-    if (label === "Top Gainers")    { router.push("/top-gainers");           return; }
-    if (label === "Top Volume")     { router.push("/top-gainers?sort=volume"); return; }
-    if (label === "Risk Scanner")   { router.push("/risk-scanner");          return; }
-    if (label === "Holder Analysis"){ router.push("/holder-analysis");       return; }
+    if (pendingNav) return; // Ignore clicks while a navigation is already in-flight
+
+    const go = (href: string) => {
+      setPendingNav(label);
+      dispatchNavStart();
+      router.push(href);
+    };
+
+    if (label === "Launches")       { go("/launches");                return; }
+    if (label === "Smart Money")    { go("/smart-money");             return; }
+    if (label === "Top Gainers")    { go("/top-gainers");             return; }
+    if (label === "Top Volume")     { go("/top-gainers?sort=volume"); return; }
+    if (label === "Risk Scanner")   { go("/risk-scanner");            return; }
+    if (label === "Holder Analysis"){ go("/holder-analysis");         return; }
     if (COMING_SOON.has(label)) {
       setComingSoonLabel(label);
       setRightPanel("coming-soon");
@@ -214,7 +258,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
     if (label === "Watchlist") { openWatchlist(); return; }
     if (label === "Radar")     { setRightPanel("token"); }
     setActiveNav(label);
-  }, [router, openWatchlist]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [router, openWatchlist, pendingNav]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const visibleTokens = useMemo(() => {
     let list = radarTokens.filter(t => chain === "all" || t.chain === chain);
@@ -246,7 +290,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
       />
       <TrendingTicker tokens={trendingTokens} onSelect={showTokenInPanel} />
       <div className="dashboardGrid">
-        <Sidebar activeItem={activeNav} onNavigate={handleNavClick} />
+        <Sidebar activeItem={activeNav} pendingItem={pendingNav} onNavigate={handleNavClick} />
         <main className="radarWorkspace">
           <LaunchRadar
             tokens={visibleTokens}
@@ -441,7 +485,11 @@ function TopNavbar({
   );
 }
 
-function Sidebar({ activeItem, onNavigate }: { activeItem: string; onNavigate: (label: string) => void }) {
+function Sidebar({ activeItem, pendingItem, onNavigate }: {
+  activeItem: string;
+  pendingItem: string | null;
+  onNavigate: (label: string) => void;
+}) {
   return (
     <aside className="sidebar">
       <nav aria-label="Dashboard">
@@ -450,12 +498,15 @@ function Sidebar({ activeItem, onNavigate }: { activeItem: string; onNavigate: (
             {section.title ? <span className="navSectionTitle">{section.title}</span> : null}
             {section.items.map((item) => {
               const Icon = item.icon;
+              const active  = activeItem  === item.label;
+              const pending = pendingItem === item.label;
               return (
                 <button
-                  className={`sideNavItem ${activeItem === item.label ? "active" : ""}`}
+                  className={`sideNavItem${active ? " active" : ""}${pending ? " pending" : ""}`}
                   key={item.label}
                   type="button"
                   onClick={() => onNavigate(item.label)}
+                  aria-busy={pending || undefined}
                 >
                   <Icon size={16} />
                   <span>{item.label}</span>
@@ -492,7 +543,7 @@ function TrendingTicker({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: 
           ))}
         </div>
       </div>
-      <button className="viewAllButton" type="button" onClick={() => router.push("/launches")}>View all <ArrowRight size={15} /></button>
+      <button className="viewAllButton" type="button" onClick={() => { dispatchNavStart(); router.push("/launches"); }}>View all <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -1012,7 +1063,7 @@ function LatestLaunchesCard({ tokens, onSelect }: { tokens: RadarToken[]; onSele
           ))}
         </tbody>
       </table>
-      <button className="panelLink" type="button" onClick={() => router.push("/launches")}>View All Launches <ArrowRight size={15} /></button>
+      <button className="panelLink" type="button" onClick={() => { dispatchNavStart(); router.push("/launches"); }}>View All Launches <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -1058,7 +1109,7 @@ function SmartMoneyFlowCard({ swaps }: { swaps: LiveSwap[] }) {
           </div>
         )}
       </div>
-      <button className="panelLink" type="button" onClick={() => router.push("/smart-money")}>View All Activity <ArrowRight size={15} /></button>
+      <button className="panelLink" type="button" onClick={() => { dispatchNavStart(); router.push("/smart-money"); }}>View All Activity <ArrowRight size={15} /></button>
     </section>
   );
 }

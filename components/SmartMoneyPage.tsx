@@ -30,9 +30,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import "../app/smart-money/smart-money.css";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { dispatchNavStart } from "./NavigationProgress";
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -456,6 +457,18 @@ function TopNavbar() {
 // ─────────────────────────────────────────────────────────────
 function SmSidebar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+
+  useEffect(() => { setPendingRoute(null); }, [pathname]);
+
+  const navigate = (route: string) => {
+    if (pendingRoute) return;
+    setPendingRoute(route);
+    dispatchNavStart();
+    router.push(route);
+  };
+
   return (
     <aside className="smSidebar">
       <nav aria-label="Smart Money navigation">
@@ -464,13 +477,15 @@ function SmSidebar() {
             {section.title ? <span className="navSectionTitle">{section.title}</span> : null}
             {section.items.map((item) => {
               const Icon = item.icon;
-              const isActive = Boolean(item.active);
+              const isActive  = Boolean(item.active);
+              const isPending = pendingRoute === item.route;
               return (
                 <button
-                  className={`sideNavItem ${isActive ? "active" : ""}`}
+                  className={`sideNavItem${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
                   key={item.label}
                   type="button"
-                  onClick={() => router.push(item.route)}
+                  aria-busy={isPending || undefined}
+                  onClick={() => navigate(item.route)}
                 >
                   <Icon size={16} />
                   <span>{item.label}</span>
@@ -631,7 +646,7 @@ function ActivityFeed({
               <a
                 className="smWalletAddr"
                 href={`/wallet/${item.walletAddr}`}
-                onClick={(e) => { e.preventDefault(); router.push(`/wallet/${item.walletAddr}`); }}
+                onClick={(e) => { e.preventDefault(); dispatchNavStart(); router.push(`/wallet/${item.walletAddr}`); }}
                 title={item.walletAddr}
               >
                 {item.walletAddr}
@@ -869,7 +884,7 @@ function Leaderboard({ entries, loading }: { entries: ApiLeaderEntry[]; loading:
           ) : displayed.length === 0 ? (
             <tr><td colSpan={6} style={{ color: "var(--faint)", textAlign: "center" }}>No smart wallets yet — run indexer:smart-wallets</td></tr>
           ) : displayed.map((row) => (
-            <tr key={row.wallet} onClick={() => router.push(`/wallet/${row.wallet}`)}>
+            <tr key={row.wallet} onClick={() => { dispatchNavStart(); router.push(`/wallet/${row.wallet}`); }}>
               <td><span className={`smRank ${rankClass(row.rank)}`}>{row.rank}</span></td>
               <td>
                 <a
@@ -937,7 +952,7 @@ function EarlyEntries({ entries }: { entries: ApiLeaderEntry[] }) {
           {sorted.length === 0 ? (
             <tr><td colSpan={4} style={{ color: "var(--faint)", textAlign: "center" }}>No data yet</td></tr>
           ) : sorted.map((row) => (
-            <tr key={row.wallet} onClick={() => router.push(`/wallet/${row.wallet}`)}>
+            <tr key={row.wallet} onClick={() => { dispatchNavStart(); router.push(`/wallet/${row.wallet}`); }}>
               <td>
                 <a
                   className="smWalletAddr"

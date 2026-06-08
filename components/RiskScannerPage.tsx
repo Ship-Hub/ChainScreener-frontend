@@ -30,10 +30,11 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { fetchTopTokens } from "../lib/api";
 import type { TokenSummary } from "../lib/types";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { dispatchNavStart } from "./NavigationProgress";
 
 // ─────────────────────────────────────────────────────────────
 // Risk factor computation
@@ -282,6 +283,18 @@ function TopNavbar() {
 // ─────────────────────────────────────────────────────────────
 function RsSidebar() {
   const router = useRouter();
+  const pathname = usePathname();
+  const [pendingRoute, setPendingRoute] = useState<string | null>(null);
+
+  useEffect(() => { setPendingRoute(null); }, [pathname]);
+
+  const navigate = (route: string) => {
+    if (pendingRoute) return;
+    setPendingRoute(route);
+    dispatchNavStart();
+    router.push(route);
+  };
+
   return (
     <aside className="rsSidebar">
       <nav aria-label="Risk Scanner navigation">
@@ -290,13 +303,15 @@ function RsSidebar() {
             {section.title ? <span className="navSectionTitle">{section.title}</span> : null}
             {section.items.map((item) => {
               const Icon = item.icon;
-              const isActive = Boolean((item as { active?: boolean }).active);
+              const isActive  = Boolean((item as { active?: boolean }).active);
+              const isPending = pendingRoute === item.route;
               return (
                 <button
-                  className={`sideNavItem ${isActive ? "active" : ""}`}
+                  className={`sideNavItem${isActive ? " active" : ""}${isPending ? " pending" : ""}`}
                   key={item.label}
                   type="button"
-                  onClick={() => router.push(item.route)}
+                  aria-busy={isPending || undefined}
+                  onClick={() => navigate(item.route)}
                 >
                   <Icon size={16} />
                   <span>{item.label}</span>
@@ -423,7 +438,7 @@ function DetailPanel({
             <button
               className="rsActionBtn primary"
               type="button"
-              onClick={() => router.push(`/token/${token.chain}/${token.address}`)}
+              onClick={() => { dispatchNavStart(); router.push(`/token/${token.chain}/${token.address}`); }}
             >
               <Eye size={14} /> View Full Token Analysis
             </button>
@@ -718,6 +733,7 @@ export function RiskScannerPage() {
                               aria-label={`View ${token.symbol} analysis`}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                dispatchNavStart();
                                 router.push(`/token/${token.chain}/${token.address}`);
                               }}
                             >
