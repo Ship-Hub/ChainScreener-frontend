@@ -120,6 +120,7 @@ type Timeframe = "5M" | "15M" | "1H" | "6H" | "24H" | "7D";
 type SortMode = "newest" | "volume" | "gainers" | "mcap";
 type ViewMode = "grid" | "list";
 type RiskFilter = "All" | "Low" | "Medium" | "High" | "Scam";
+type ChainFilter = "all" | "base" | "eth" | "bsc";
 
 interface TokenLaunch {
   id: string;
@@ -505,18 +506,40 @@ const SORT_OPTIONS: Array<{ value: SortMode; label: string }> = [
   { value: "mcap",    label: "Market Cap" },
 ];
 
+const CHAIN_OPTIONS: Array<{ value: ChainFilter; label: string }> = [
+  { value: "all",  label: "All"  },
+  { value: "base", label: "BASE" },
+  { value: "eth",  label: "ETH"  },
+  { value: "bsc",  label: "BSC"  },
+];
+
 function TabBar({
-  active, onTabChange, view, onViewChange, sort, onSortChange,
+  active, onTabChange, view, onViewChange, sort, onSortChange, chain, onChainChange,
 }: {
   active: Tab; onTabChange: (t: Tab) => void;
   view: ViewMode; onViewChange: (v: ViewMode) => void;
   sort: SortMode; onSortChange: (s: SortMode) => void;
+  chain: ChainFilter; onChainChange: (c: ChainFilter) => void;
 }) {
   const [sortOpen, setSortOpen] = useState(false);
   const currentLabel = SORT_OPTIONS.find(o => o.value === sort)?.label ?? "Newest";
 
   return (
-    <div className="lpTabBar">
+    <div className="lpTabBar" style={{ flexWrap: "wrap", gap: 8 }}>
+      {/* Chain filter pills — prominent, above/beside the tabs */}
+      <div className="lpChainGroup">
+        {CHAIN_OPTIONS.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            className={`lpChainPill${chain === value ? " lpChainPillActive" : ""}${value !== "all" ? ` lpChainPill--${value}` : ""}`}
+            onClick={() => onChainChange(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="lpTabGroup">
         {TABS.map((tab) => (
           <button key={tab.id} className={`lpTab ${active === tab.id ? "lpTabActive" : ""}`} type="button" onClick={() => onTabChange(tab.id)}>
@@ -1195,26 +1218,32 @@ interface LaunchesPageProps {
   initialPlatformTokens?: Record<string, TokenSummary[]>;
 }
 
+const PAGE_SIZE = 100;
+
 export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }: LaunchesPageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>("24H");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [sort, setSort] = useState<SortMode>("newest");
-  const [displayLimit, setDisplayLimit] = useState(20);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<FilterState>(DEFAULT_FILTER);
-  // Pre-populate state from SSR props so the page is never blank on first paint.
+  // Pre-populate from SSR props so the page is never blank on first paint.
   const [rawTokens, setRawTokens] = useState<TokenSummary[]>(initialTokens);
   const [platformTokens, setPlatformTokens] = useState<Record<string, TokenSummary[]>>(initialPlatformTokens);
-  // Only show the spinner when there is no SSR data to display yet.
   const [loading, setLoading] = useState(initialTokens.length === 0);
+  // Pagination: nextOffset = how many tokens we've accumulated; hasMore = whether API has more.
+  const [nextOffset, setNextOffset] = useState(initialTokens.length);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [showCustomize, setShowCustomize] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Set<ColumnKey>>(new Set());
 
-  // Track whether we already have SSR data so we can skip the first client fetch.
   const hasInitialData = useRef(initialTokens.length > 0);
+  // Keeps track of the chain that was used for the last API fetch so chain-change
+  // effect can tell whether this is a real change vs. the initial render.
+  const activeChainRef = useRef<string>(filterState.chain);
 
   // Starred — localStorage persistence
   const [starred, setStarred] = useState<Record<string, boolean>>({});
@@ -1231,59 +1260,84 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
 
   const timeframes: Timeframe[] = ["5M", "15M", "1H", "6H", "24H", "7D"];
 
+  // ─── Core fetch helper ─────────────────────────────────────────────────────
+  // offset=0 → first page / background refresh (smart-merge: updates existing rows,
+  //             prepends brand-new ones — never wipes the list the user is reading).
+  // offset>0 → append-only "Load More" pagination.
+  const fetchPage = useCallback((offset: number, chain: string, showSpinner = false) => {
+    const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    const chainParam = chain !== "all" ? `&chain=${chain}` : "";
+    const url = `${api}/api/launches?offset=${offset}&limit=${PAGE_SIZE}&maxAgeDays=7${chainParam}`;
+
+    if (offset === 0 && showSpinner) setLoading(true);
+    if (offset > 0) setLoadingMore(true);
+
+    fetch(url)
+      .then(r => r.json())
+      .then((json: { data?: TokenSummary[]; hasMore?: boolean }) => {
+        const fresh: TokenSummary[] = json.data ?? [];
+        setHasMore(json.hasMore ?? fresh.length >= PAGE_SIZE);
+
+        if (offset === 0) {
+          // Smart merge — background refresh never blanks what the user already sees.
+          setRawTokens(prev => {
+            const freshMap = new Map(fresh.map(t => [`${t.chain}:${t.address}`, t]));
+            const existingKeys = new Set(prev.map(t => `${t.chain}:${t.address}`));
+            const brandNew = fresh.filter(t => !existingKeys.has(`${t.chain}:${t.address}`));
+            const updated  = prev.map(t => freshMap.get(`${t.chain}:${t.address}`) ?? t);
+            return [...brandNew, ...updated];
+          });
+          setNextOffset(fresh.length);
+        } else {
+          // Append, deduplicated.
+          setRawTokens(prev => {
+            const existingKeys = new Set(prev.map(t => `${t.chain}:${t.address}`));
+            return [...prev, ...fresh.filter(t => !existingKeys.has(`${t.chain}:${t.address}`))];
+          });
+          setNextOffset(prev => prev + fresh.length);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (offset === 0 && showSpinner) setLoading(false);
+        if (offset > 0) setLoadingMore(false);
+      });
+  }, []);
+
+  // ─── Initial load + background refresh ────────────────────────────────────
   useEffect(() => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-    const fetchJsonWithTimeout = async (url: string, timeoutMs: number) => {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) return null;
-        return response.json();
-      } catch {
-        return null;
-      } finally {
-        window.clearTimeout(timer);
-      }
-    };
 
-    // Core fetch — showLoading controls whether we display the loading spinner.
-    // Background refreshes run silently so the existing data stays visible.
-    const doFetch = (showLoading: boolean) => {
-      if (showLoading) setLoading(true);
-
-      fetchJsonWithTimeout(`${api}/api/launches?limit=80`, showLoading ? 5_000 : 8_000)
-        .then((launchData) => {
-          if (launchData && typeof launchData === "object" && "data" in launchData) {
-            setRawTokens((launchData as { data?: TokenSummary[] }).data ?? []);
-          }
-        })
-        .finally(() => { if (showLoading) setLoading(false); });
-
-      void fetchJsonWithTimeout(`${api}/api/launches/by-platform`, 4_000)
-        .then((platformData) => {
-          if (platformData && typeof platformData === "object" && !Array.isArray(platformData)) {
-            setPlatformTokens(platformData as Record<string, TokenSummary[]>);
-          }
-        });
-
-      void fetchJsonWithTimeout(`${api}/api/alerts/counts`, 2_500)
-        .then((alertData) => {
-          if (!alertData || typeof alertData !== "object") return;
-          const counts = "data" in alertData ? (alertData as { data?: Record<string, number> }).data ?? {} : alertData;
-          setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
-        });
-    };
-
-    // If the SSR pass already gave us data, skip the initial spinner fetch; otherwise fetch now.
     if (!hasInitialData.current) {
-      doFetch(true);
+      fetchPage(0, filterState.chain, true);
     }
 
-    // Background refresh every 30 s — no loading spinner so visible data never disappears.
-    const interval = setInterval(() => doFetch(false), 30_000);
+    // Platform strip and alert count — one-shot, no spinner
+    fetch(`${api}/api/launches/by-platform`)
+      .then(r => r.json()).then(d => setPlatformTokens(d ?? {})).catch(() => {});
+    fetch(`${api}/api/alerts/counts`)
+      .then(r => r.json())
+      .then(d => {
+        const counts = d.data ?? d ?? {};
+        setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
+      }).catch(() => {});
+
+    // Silent background refresh every 30 s — smart merge keeps existing rows visible.
+    const interval = setInterval(() => fetchPage(0, activeChainRef.current), 30_000);
     return () => clearInterval(interval);
+  // fetchPage is stable (useCallback with no deps that change); suppress exhaustive-deps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ─── Chain filter change: clear list, reset offset, re-fetch page 1 ───────
+  useEffect(() => {
+    if (activeChainRef.current === filterState.chain) return; // skip on initial mount
+    activeChainRef.current = filterState.chain;
+    setRawTokens([]);
+    setNextOffset(0);
+    setHasMore(true);
+    fetchPage(0, filterState.chain, true);
+  }, [filterState.chain, fetchPage]);
 
   const allLaunches = useMemo(() => rawTokens.map(summaryToLaunch), [rawTokens]);
 
@@ -1333,8 +1387,8 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
     return list;
   }, [allLaunches, activeTab, activeTimeframe, searchQuery, filterState, sort]);
 
-  const displayedLaunches = filteredLaunches.slice(0, displayLimit);
-  const hasMore = filteredLaunches.length > displayLimit;
+  // All filtered tokens — rendered in full (no client-side page limit; pagination is API-side).
+  const displayedLaunches = filteredLaunches;
 
   const stats: LaunchStats = {
     total: rawTokens.length,
@@ -1350,19 +1404,17 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
 
   const updateFilter = useCallback((partial: Partial<FilterState>) => {
     setFilterState(prev => ({ ...prev, ...partial }));
-    setDisplayLimit(20); // reset pagination on filter change
   }, []);
 
   const resetFilters = useCallback(() => {
     setFilterState(DEFAULT_FILTER);
-    setDisplayLimit(20);
   }, []);
 
   const isComingSoon = activeTab === "presale" || activeTab === "dex-launch";
 
   return (
     <div className="appShell">
-      <TopNavbar searchQuery={searchQuery} onSearchChange={q => { setSearchQuery(q); setDisplayLimit(20); }} alertCount={alertCount} />
+      <TopNavbar searchQuery={searchQuery} onSearchChange={q => setSearchQuery(q)} alertCount={alertCount} />
       <div className="lpShell">
         <Sidebar />
         <main className="lpMain">
@@ -1374,7 +1426,7 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
             <div className="lpTimeframeGroup">
               {timeframes.map((tf) => (
                 <button key={tf} className={activeTimeframe === tf ? "lpTfActive" : ""} type="button"
-                  onClick={() => { setActiveTimeframe(tf); setDisplayLimit(20); }}>
+                  onClick={() => setActiveTimeframe(tf)}>
                   {tf}
                 </button>
               ))}
@@ -1444,8 +1496,13 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
             </div>
           )}
 
-          <TabBar active={activeTab} onTabChange={t => { setActiveTab(t); setDisplayLimit(20); }}
-            view={viewMode} onViewChange={setViewMode} sort={sort} onSortChange={setSort} />
+          <TabBar
+            active={activeTab} onTabChange={t => setActiveTab(t)}
+            view={viewMode} onViewChange={setViewMode}
+            sort={sort} onSortChange={setSort}
+            chain={filterState.chain as ChainFilter}
+            onChainChange={c => updateFilter({ chain: c })}
+          />
 
           {loading ? (
             <div style={{ padding: "32px 0", textAlign: "center", color: "var(--faint)", fontSize: 13 }}>Loading launches…</div>
@@ -1467,9 +1524,15 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
               hiddenCols={hiddenCols} />
           )}
 
-          {hasMore && (
-            <button className="lpLoadMore" type="button" onClick={() => setDisplayLimit(l => l + 20)}>
-              Load {Math.min(20, filteredLaunches.length - displayLimit)} more ↓
+          {/* Load More — fetches the next page from the API (not a client-side slice) */}
+          {hasMore && !loading && (
+            <button
+              className="lpLoadMore"
+              type="button"
+              disabled={loadingMore}
+              onClick={() => fetchPage(nextOffset, filterState.chain)}
+            >
+              {loadingMore ? "Loading…" : `Load older launches ↓`}
             </button>
           )}
 

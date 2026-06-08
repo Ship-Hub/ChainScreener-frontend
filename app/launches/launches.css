@@ -163,6 +163,56 @@
   flex-wrap: wrap;
 }
 
+/* Chain filter pills — prominent row above the tab group */
+.lpChainGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding-bottom: 4px;
+  border-bottom: 1px solid oklch(0.26 0.04 255 / 0.5);
+  margin-bottom: 4px;
+}
+
+.lpChainPill {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  color: var(--muted);
+  background: oklch(0.12 0.018 255);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  transition: border-color 140ms, background 140ms, color 140ms;
+}
+.lpChainPill:hover { color: var(--text); border-color: oklch(0.55 0.1 210 / 0.7); }
+
+/* Active: glowing pill colour per chain */
+.lpChainPill.lpChainPillActive {
+  color: #fff;
+}
+.lpChainPill.lpChainPillActive:not(.lpChainPill--base):not(.lpChainPill--eth):not(.lpChainPill--bsc) {
+  border-color: oklch(0.62 0.22 285 / 0.8);
+  background: linear-gradient(135deg, oklch(0.26 0.13 285), oklch(0.18 0.06 258));
+}
+.lpChainPill--base.lpChainPillActive {
+  border-color: oklch(0.55 0.26 255 / 0.9);
+  background: linear-gradient(135deg, oklch(0.22 0.14 255), oklch(0.15 0.06 255));
+  box-shadow: 0 0 8px oklch(0.55 0.26 255 / 0.35);
+}
+.lpChainPill--eth.lpChainPillActive {
+  border-color: oklch(0.65 0.14 275 / 0.9);
+  background: linear-gradient(135deg, oklch(0.24 0.09 275), oklch(0.16 0.04 275));
+  box-shadow: 0 0 8px oklch(0.65 0.14 275 / 0.35);
+}
+.lpChainPill--bsc.lpChainPillActive {
+  border-color: oklch(0.8 0.15 83 / 0.9);
+  background: linear-gradient(135deg, oklch(0.28 0.1 83), oklch(0.18 0.06 83));
+  box-shadow: 0 0 8px oklch(0.8 0.15 83 / 0.35);
+}
+
 .lpTabGroup {
   display: flex;
   align-items: center;
