@@ -32,10 +32,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--cyan), var(--violet));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--cyan);
 }
 
 .smPageSubtitle {
@@ -918,8 +915,19 @@
     padding: 10px;
   }
 
+  .smPageHeader {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
   .smPageTitle {
     font-size: 18px;
+  }
+
+  .smHeaderRight {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .smContentGrid,

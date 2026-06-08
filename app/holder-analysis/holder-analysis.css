@@ -38,10 +38,7 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--violet), var(--cyan));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--violet);
 }
 
 .haSubtitle {
@@ -526,11 +523,13 @@
 }
 
 .haMovementBuy {
-  border-left: 2px solid var(--green);
+  border-color: oklch(0.5 0.15 151 / 0.42);
+  background: oklch(0.14 0.04 151 / 0.22);
 }
 
 .haMovementSell {
-  border-left: 2px solid var(--red);
+  border-color: oklch(0.55 0.17 25 / 0.42);
+  background: oklch(0.14 0.05 25 / 0.22);
 }
 
 .haMovement:hover {

@@ -40,10 +40,7 @@
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--green), var(--cyan));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
 }
 
 .tgPageHeaderLeft p {
@@ -981,6 +978,16 @@
     padding: 10px 12px;
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .tgPageHeader {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .tgPageHeaderRight {
+    width: 100%;
   }
 
   .tgInsightsGrid {

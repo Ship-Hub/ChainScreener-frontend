@@ -1120,7 +1120,11 @@
 
 @media (max-width: 900px) {
   .lpShell {
-    grid-template-columns: 1fr;
+    grid-template-columns: 188px 1fr;
+  }
+
+  .lpRightPanel {
+    display: none;
   }
 
   .lpStatGrid {
@@ -1130,13 +1134,18 @@
 
 @media (max-width: 760px) {
   .lpShell {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
     gap: 10px;
     padding: 10px;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 
   .lpSidebar {
     display: none;
+  }
+
+  /* After sidebar is hidden, let main take the full single column */
+  .lpMain {
+    grid-column: 1;
   }
 
   .lpTopbar {
