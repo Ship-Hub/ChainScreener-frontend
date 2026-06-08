@@ -38,7 +38,7 @@ import { MobileBottomNav } from "./MobileBottomNav";
 import { dispatchNavStart } from "./NavigationProgress";
 
 // ── Shared types from market API ──────────────────────────────
-interface TokenSummary {
+export interface TokenSummary {
   chain: string;
   address: string;
   symbol: string;

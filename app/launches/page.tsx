@@ -1,5 +1,5 @@
 import "./launches.css";
-import { LaunchesPage } from "../../components/LaunchesPage";
+import { LaunchesPage, type TokenSummary } from "../../components/LaunchesPage";
 
 export const metadata = { title: "Launches — Chain Screener" };
 
@@ -34,12 +34,12 @@ export default async function Launches() {
     safeFetch(`${api}/api/launches/by-platform`, 1_200),
   ]);
 
-  const initialTokens =
-    (launchJson as { data?: unknown[] } | null)?.data ?? [];
+  const initialTokens: TokenSummary[] =
+    (launchJson as { data?: TokenSummary[] } | null)?.data ?? [];
 
-  const initialPlatformTokens =
+  const initialPlatformTokens: Record<string, TokenSummary[]> =
     platformJson && typeof platformJson === "object" && !Array.isArray(platformJson)
-      ? (platformJson as Record<string, unknown[]>)
+      ? (platformJson as Record<string, TokenSummary[]>)
       : {};
 
   return (
