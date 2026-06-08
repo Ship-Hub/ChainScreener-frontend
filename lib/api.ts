@@ -1,7 +1,7 @@
-import type { AlertCounts, Candle, LivePool, LiveSwap, TokenDetail, TokenSummary, TokenSwap } from "./types";
+import type { AlertCounts, Candle, LiveFeedSnapshot, LivePool, LiveSwap, TokenDetail, TokenSummary, TokenSwap } from "./types";
 import { mockTokens } from "./mockData";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 async function fetchJson<T>(path: string, fallback: T): Promise<T> {
   try {
@@ -72,4 +72,29 @@ export async function fetchDashboardData() {
   const dashboardTrending = liveMarketTokens.length ? liveMarketTokens : trending;
 
   return { tokens: dashboardTokens, trending: dashboardTrending, livePools, liveSwaps, alertCounts };
+}
+
+export function subscribeLiveFeed(
+  onSnapshot: (snapshot: LiveFeedSnapshot) => void,
+  onError?: (error: Event) => void,
+) {
+  if (typeof window === "undefined" || !("EventSource" in window)) {
+    return () => {};
+  }
+
+  const source = new EventSource(`${apiUrl}/api/live/stream`);
+
+  source.addEventListener("snapshot", (event) => {
+    try {
+      onSnapshot(JSON.parse((event as MessageEvent<string>).data) as LiveFeedSnapshot);
+    } catch {
+      // Ignore malformed frames; EventSource will keep the connection alive.
+    }
+  });
+
+  source.onerror = (event) => {
+    onError?.(event);
+  };
+
+  return () => source.close();
 }

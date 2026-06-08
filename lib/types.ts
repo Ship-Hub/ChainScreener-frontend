@@ -140,3 +140,11 @@ export type LiveSwap = {
 };
 
 export type AlertCounts = Record<string, number>;
+
+export type LiveFeedSnapshot = {
+  type: "snapshot";
+  emittedAt: string;
+  tokens: TokenSummary[];
+  livePools: LivePool[];
+  liveSwaps: LiveSwap[];
+};
