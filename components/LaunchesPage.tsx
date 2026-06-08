@@ -1188,7 +1188,14 @@ const DEFAULT_FILTER: FilterState = {
   chain: "all",
 };
 
-export function LaunchesPage() {
+interface LaunchesPageProps {
+  /** Server-rendered initial token list (skips client-side fetch on first render). */
+  initialTokens?: TokenSummary[];
+  /** Server-rendered platform token map (clanker / bankr / …). */
+  initialPlatformTokens?: Record<string, TokenSummary[]>;
+}
+
+export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }: LaunchesPageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [activeTimeframe, setActiveTimeframe] = useState<Timeframe>("24H");
@@ -1197,12 +1204,17 @@ export function LaunchesPage() {
   const [displayLimit, setDisplayLimit] = useState(20);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterState, setFilterState] = useState<FilterState>(DEFAULT_FILTER);
-  const [rawTokens, setRawTokens] = useState<TokenSummary[]>([]);
-  const [platformTokens, setPlatformTokens] = useState<Record<string, TokenSummary[]>>({});
-  const [loading, setLoading] = useState(true);
+  // Pre-populate state from SSR props so the page is never blank on first paint.
+  const [rawTokens, setRawTokens] = useState<TokenSummary[]>(initialTokens);
+  const [platformTokens, setPlatformTokens] = useState<Record<string, TokenSummary[]>>(initialPlatformTokens);
+  // Only show the spinner when there is no SSR data to display yet.
+  const [loading, setLoading] = useState(initialTokens.length === 0);
   const [alertCount, setAlertCount] = useState(0);
   const [showCustomize, setShowCustomize] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Set<ColumnKey>>(new Set());
+
+  // Track whether we already have SSR data so we can skip the first client fetch.
+  const hasInitialData = useRef(initialTokens.length > 0);
 
   // Starred — localStorage persistence
   const [starred, setStarred] = useState<Record<string, boolean>>({});
@@ -1221,20 +1233,34 @@ export function LaunchesPage() {
 
   useEffect(() => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-    setLoading(true);
-    Promise.all([
-      fetch(`${api}/api/launches`).then(r => r.json()),
-      fetch(`${api}/api/launches/by-platform`).then(r => r.json()),
-      fetch(`${api}/api/alerts/counts`).then(r => r.json()).catch(() => ({ data: {} })),
-    ])
-      .then(([launchData, platformData, alertData]) => {
-        setRawTokens(launchData.data ?? []);
-        setPlatformTokens(platformData ?? {});
-        const counts = alertData.data ?? alertData ?? {};
-        setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+
+    // Core fetch — showLoading controls whether we display the loading spinner.
+    // Background refreshes run silently so the existing data stays visible.
+    const doFetch = (showLoading: boolean) => {
+      if (showLoading) setLoading(true);
+      Promise.all([
+        fetch(`${api}/api/launches`).then(r => r.json()),
+        fetch(`${api}/api/launches/by-platform`).then(r => r.json()),
+        fetch(`${api}/api/alerts/counts`).then(r => r.json()).catch(() => ({ data: {} })),
+      ])
+        .then(([launchData, platformData, alertData]) => {
+          setRawTokens(launchData.data ?? []);
+          setPlatformTokens(platformData ?? {});
+          const counts = alertData.data ?? alertData ?? {};
+          setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
+        })
+        .catch(() => {})
+        .finally(() => { if (showLoading) setLoading(false); });
+    };
+
+    // If the SSR pass already gave us data, skip the initial spinner fetch; otherwise fetch now.
+    if (!hasInitialData.current) {
+      doFetch(true);
+    }
+
+    // Background refresh every 30 s — no loading spinner so visible data never disappears.
+    const interval = setInterval(() => doFetch(false), 30_000);
+    return () => clearInterval(interval);
   }, []);
 
   const allLaunches = useMemo(() => rawTokens.map(summaryToLaunch), [rawTokens]);
