@@ -1131,6 +1131,8 @@
 @media (max-width: 760px) {
   .lpShell {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+    padding: 10px;
   }
 
   .lpSidebar {
@@ -1144,8 +1146,23 @@
     gap: 8px;
   }
 
+  .lpHeader {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .lpHeaderLeft h1 {
+    font-size: 20px;
+  }
+
   .lpStatGrid {
     grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .lpStatValue {
+    font-size: 18px;
   }
 
   .lpTokenTable {
@@ -1170,11 +1187,148 @@
     display: none;
   }
 
+  /* Mobile filter drawer — hidden by default, toggled via JS class */
+  .lpFilterDrawer {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: oklch(0.1 0.015 255 / 0.92);
+    backdrop-filter: blur(6px);
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .lpFilterDrawer.open {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lpFilterDrawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .lpFilterDrawerHeader h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text);
+  }
+
+  .lpFilterDrawerClose {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    background: oklch(0.16 0.022 255);
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .lpFilterDrawer .lpFilterPanel {
+    display: block;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .lpFilterDrawer .lpPanelHead {
+    display: none;
+  }
+
+  .lpFilterDrawer .lpPanelBody {
+    padding: 0;
+  }
+
+  .lpFilterDrawer .lpApplyBtn {
+    margin-top: 12px;
+  }
+
+  /* Mobile filter toggle button */
+  .lpMobileFilterBtn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--muted);
+    background: var(--panel);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: border-color 150ms, color 150ms;
+  }
+
+  .lpMobileFilterBtn:hover {
+    border-color: oklch(0.58 0.12 210 / 0.72);
+    color: var(--text);
+  }
+
+  /* Alert band mobile */
+  .lpAlertBand {
+    grid-template-columns: 1fr;
+  }
+
+  .lpAlertBandLabel {
+    padding: 8px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 11px;
+  }
+
+  .lpAlertViewAll {
+    display: none;
+  }
+
+  .lpAlertCards {
+    overflow-x: auto;
+  }
+
+  .lpAlertCard {
+    min-width: 160px;
+    padding: 8px 12px;
+  }
+
   /* Touch targets */
-  .lpTabBtn,
-  .lpChainBtn,
-  .lpFilterToggle {
+  .lpTab,
+  .lpChainPill,
+  .lpSortSelect,
+  .lpTimeframeGroup button,
+  .lpLoadMore,
+  .lpMobileFilterBtn {
     min-height: 44px;
+  }
+
+  .lpStatCard {
+    min-height: 72px;
+    padding: 10px 12px;
+  }
+
+  .lpPlatformCard {
+    width: 90px;
+    min-height: 44px;
+  }
+
+  /* Grid view mobile */
+  .lpGridView {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 761px) {
+  .lpMobileFilterBtn {
+    display: none;
   }
 }
 

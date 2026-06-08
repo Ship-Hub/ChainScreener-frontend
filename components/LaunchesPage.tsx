@@ -514,12 +514,13 @@ const CHAIN_OPTIONS: Array<{ value: ChainFilter; label: string }> = [
 ];
 
 function TabBar({
-  active, onTabChange, view, onViewChange, sort, onSortChange, chain, onChainChange,
+  active, onTabChange, view, onViewChange, sort, onSortChange, chain, onChainChange, children,
 }: {
   active: Tab; onTabChange: (t: Tab) => void;
   view: ViewMode; onViewChange: (v: ViewMode) => void;
   sort: SortMode; onSortChange: (s: SortMode) => void;
   chain: ChainFilter; onChainChange: (c: ChainFilter) => void;
+  children?: React.ReactNode;
 }) {
   const [sortOpen, setSortOpen] = useState(false);
   const currentLabel = SORT_OPTIONS.find(o => o.value === sort)?.label ?? "Newest";
@@ -567,10 +568,11 @@ function TabBar({
           <button className={view === "grid" ? "lpViewActive" : ""} type="button" aria-label="Grid view" onClick={() => onViewChange("grid")}><Grid size={14} /></button>
           <button className={view === "list" ? "lpViewActive" : ""} type="button" aria-label="List view" onClick={() => onViewChange("list")}><List size={14} /></button>
         </div>
+        {children}
       </div>
     </div>
-  );
-}
+    );
+  }
 
 /* ══════════════════════════════════════════════════════════
    Token table
@@ -1236,6 +1238,7 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
   const [nextOffset, setNextOffset] = useState(initialTokens.length);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showMobileFilter, setShowMobileFilter] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const [showCustomize, setShowCustomize] = useState(false);
   const [hiddenCols, setHiddenCols] = useState<Set<ColumnKey>>(new Set());
@@ -1502,7 +1505,29 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
             sort={sort} onSortChange={setSort}
             chain={filterState.chain as ChainFilter}
             onChainChange={c => updateFilter({ chain: c })}
-          />
+          >
+            <button
+              className="lpMobileFilterBtn"
+              type="button"
+              onClick={() => setShowMobileFilter(true)}
+            >
+              <Filter size={14} /> Filters
+            </button>
+          </TabBar>
+
+          {/* Mobile filter drawer */}
+          {showMobileFilter && (
+            <div className="lpFilterDrawer open" onClick={(e) => { if (e.target === e.currentTarget) setShowMobileFilter(false); }}>
+              <div className="lpFilterDrawerHeader">
+                <h3>Filters</h3>
+                <button className="lpFilterDrawerClose" type="button" onClick={() => setShowMobileFilter(false)}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                </button>
+              </div>
+              <FiltersPanel filterState={filterState} onFilterChange={updateFilter} onReset={resetFilters} />
+              <button className="lpApplyBtn" type="button" onClick={() => setShowMobileFilter(false)}>Apply Filters</button>
+            </div>
+          )}
 
           {loading ? (
             <div style={{ padding: "32px 0", textAlign: "center", color: "var(--faint)", fontSize: 13 }}>Loading launches…</div>

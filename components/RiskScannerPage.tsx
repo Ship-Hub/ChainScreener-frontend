@@ -752,6 +752,21 @@ export function RiskScannerPage() {
 
         {/* Right detail panel */}
         <DetailPanel token={selectedToken} watchlist={watchlist} onToggleWatchlist={toggleWatchlist} />
+
+        {/* Mobile detail drawer */}
+        {selectedToken && (
+          <div className="rsMobileDetail" onClick={(e) => { if (e.target === e.currentTarget) setSelectedToken(null); }}>
+            <div className="rsMobileDetailPanel">
+              <div className="rsMobileDetailHeader">
+                <span className="rsMobileDetailLabel">Token Detail</span>
+                <button className="rsMobileDetailClose" type="button" onClick={() => setSelectedToken(null)}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                </button>
+              </div>
+              <DetailPanel token={selectedToken} watchlist={watchlist} onToggleWatchlist={toggleWatchlist} />
+            </div>
+          </div>
+        )}
       </div>
       <MobileBottomNav />
     </div>

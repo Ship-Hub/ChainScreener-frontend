@@ -46,12 +46,12 @@ async function fetchClientJson<T>(path: string, fallback: T): Promise<T> {
 
 export async function fetchTopTokens(sort: "volume" | "gainers" | "losers" = "volume", chain?: string): Promise<TokenSummary[]> {
   const chainParam = chain && chain !== "all" ? `&chain=${chain}` : "";
-  return fetchClientJson<TokenSummary[]>(`/api/market/tokens?sort=${sort}${chainParam}`, []);
+  return fetchClientJson<TokenSummary[]>(`/api/market/tokens?sort=${sort}&minVolume=10${chainParam}`, []);
 }
 
 export async function fetchLiveData() {
   const [tokens, livePools, liveSwaps] = await Promise.all([
-    fetchClientJson<TokenSummary[]>("/api/market/tokens", []),
+    fetchClientJson<TokenSummary[]>("/api/market/tokens?minVolume=10", []),
     fetchClientJson<LivePool[]>("/api/indexer/pools?limit=12", []),
     fetchClientJson<LiveSwap[]>("/api/indexer/swaps?limit=12", []),
   ]);
