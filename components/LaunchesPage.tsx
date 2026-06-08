@@ -1267,7 +1267,7 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
   const fetchPage = useCallback((offset: number, chain: string, showSpinner = false) => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
     const chainParam = chain !== "all" ? `&chain=${chain}` : "";
-    const url = `${api}/api/launches?offset=${offset}&limit=${PAGE_SIZE}&maxAgeDays=7${chainParam}`;
+    const url = `${api}/api/launches?offset=${offset}&limit=${PAGE_SIZE}&maxAgeDays=7&minVolume=10${chainParam}`;
 
     if (offset === 0 && showSpinner) setLoading(true);
     if (offset > 0) setLoadingMore(true);
@@ -1287,7 +1287,7 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
             const updated  = prev.map(t => freshMap.get(`${t.chain}:${t.address}`) ?? t);
             return [...brandNew, ...updated];
           });
-          setNextOffset(fresh.length);
+          setNextOffset(prev => Math.max(prev, fresh.length));
         } else {
           // Append, deduplicated.
           setRawTokens(prev => {

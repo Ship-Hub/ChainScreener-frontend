@@ -67,7 +67,7 @@ export type TokenDetail = {
 export type TokenSwap = {
   chain: ChainKey;
   dexName: string;
-  protocolVersion: string;
+  protocolVersion: "v2" | "v3" | "v4";
   poolAddress: string | null;
   token0: string;
   token1: string;

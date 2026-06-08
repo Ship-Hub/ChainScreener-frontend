@@ -45,7 +45,7 @@ export function TokenPage({ token }: Props) {
 
   const handleOhlc = useCallback((bar: OhlcBar) => setOhlc(bar), []);
 
-  // ── Historical candles — initial load + refresh every 10 s ───────────────
+  // ── Historical candles — initial load + refresh every 30 s ───────────────
   useEffect(() => {
     let cancelled = false;
     setLoadingCandles(true);
@@ -54,14 +54,14 @@ export function TokenPage({ token }: Props) {
       .finally(() => { if (!cancelled) setLoadingCandles(false); });
     const id = globalThis.setInterval(() => {
       fetchTokenCandles(token.chain, token.address, interval).then((c) => { if (!cancelled) setCandles(c); });
-    }, 10_000);
+    }, 30_000);
     return () => { cancelled = true; globalThis.clearInterval(id); };
   }, [token.chain, token.address, interval]);
 
-  // ── Live swaps — poll every 5 s for real-time feel ────────────────────────
+  // ── Live swaps — poll every 15 s for real-time feel ───────────────────────
   useEffect(() => {
     fetchTokenSwaps(token.chain, token.address, 100).then(setSwaps);
-    const id = globalThis.setInterval(() => fetchTokenSwaps(token.chain, token.address, 100).then(setSwaps), 5_000);
+    const id = globalThis.setInterval(() => fetchTokenSwaps(token.chain, token.address, 100).then(setSwaps), 15_000);
     return () => globalThis.clearInterval(id);
   }, [token.chain, token.address]);
 
@@ -693,7 +693,12 @@ function parseSwap(swap: TokenSwap, addr: string, decimals: number) {
   const quoteAmount = Math.abs(Number(quoteRaw)) / 10 ** quoteDecimals;
   const usdValue = quoteAmount * (quotePriceUsd || 0);
   const priceUsd = tokenAmount > 0 && usdValue > 0 ? usdValue / tokenAmount : 0;
-  return { isBuy: Number(tokenRaw) < 0, tokenAmount, quoteAmount, usdValue, priceUsd };
+  // V2 Swap event: delta = amountOut - amountIn. Positive delta = token left pool = user bought it.
+  // V3/V4 Swap event: signed pool delta. Negative = token left pool = user bought it.
+  const isV2 = swap.protocolVersion === "v2";
+  const tokenRawNum = Number(tokenRaw);
+  const isBuy = isV2 ? tokenRawNum > 0 : tokenRawNum < 0;
+  return { isBuy, tokenAmount, quoteAmount, usdValue, priceUsd };
 }
 
 function getTxBadge(usdValue: number, isBuy: boolean): string | null {

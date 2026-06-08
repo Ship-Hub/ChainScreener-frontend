@@ -51,10 +51,14 @@ export function CandlestickChart({ candles, liveCandle, interval, onIntervalChan
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const volSeriesRef = useRef<any>(null);
   const [isEmpty, setIsEmpty] = useState(false);
+  const chartCreatedRef = useRef(false);
 
-  // ── Full chart creation whenever historical candles or interval changes ───
+  // ── Chart instance creation (one-time, on mount) ────────
   useEffect(() => {
+    if (chartCreatedRef.current) return;
     if (!containerRef.current) return;
+    chartCreatedRef.current = true;
+
     if (candles.length === 0 && !liveCandle) {
       setIsEmpty(true);
       onOhlcChange?.(null);
@@ -66,13 +70,6 @@ export function CandlestickChart({ candles, liveCandle, interval, onIntervalChan
 
     import("lightweight-charts").then((lc) => {
       if (!containerRef.current) return;
-
-      if (chartRef.current) {
-        try { chartRef.current.remove(); } catch { /* ignore */ }
-        chartRef.current = null;
-        seriesRef.current = null;
-        volSeriesRef.current = null;
-      }
 
       const el = containerRef.current;
       const chart = lc.createChart(el, {
@@ -115,22 +112,10 @@ export function CandlestickChart({ candles, liveCandle, interval, onIntervalChan
       chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
       volSeriesRef.current = volumeSeries;
 
-      const { mapped, volMapped } = buildChartData(candles, liveCandle);
-      candleSeries.setData(mapped);
-      volumeSeries.setData(volMapped);
-      chart.timeScale().fitContent();
-
-      const last = mapped[mapped.length - 1];
-      if (last) onOhlcChange?.({ open: last.open, high: last.high, low: last.low, close: last.close, time: last.time });
-
       chart.subscribeCrosshairMove((param: unknown) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const p = param as any;
-        const fallback = mapped[mapped.length - 1];
-        if (!p?.time || !p?.seriesData) {
-          if (fallback) onOhlcChange?.({ open: fallback.open, high: fallback.high, low: fallback.low, close: fallback.close, time: fallback.time });
-          return;
-        }
+        if (!p?.time || !p?.seriesData) return;
         const bar = p.seriesData.get(candleSeries);
         if (bar) onOhlcChange?.({ ...bar, time: p.time });
       });
@@ -149,12 +134,34 @@ export function CandlestickChart({ candles, liveCandle, interval, onIntervalChan
         chartRef.current = null;
         seriesRef.current = null;
         volSeriesRef.current = null;
+        chartCreatedRef.current = false;
       };
     });
 
     return () => cleanup?.();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles]); // only full-recreate on historical candle changes
+  }, []); // Only on mount
+
+  // ── Set data whenever candles/liveCandle changes (no full re-creation) ─────
+  useEffect(() => {
+    if (!seriesRef.current || !volSeriesRef.current) return;
+    if (candles.length === 0 && !liveCandle) {
+      setIsEmpty(true);
+      return;
+    }
+    setIsEmpty(false);
+
+    const { mapped, volMapped } = buildChartData(candles, liveCandle);
+    try {
+      seriesRef.current.setData(mapped);
+      volSeriesRef.current.setData(volMapped);
+      chartRef.current?.timeScale().fitContent();
+
+      const last = mapped[mapped.length - 1];
+      if (last) onOhlcChange?.({ open: last.open, high: last.high, low: last.low, close: last.close, time: last.time });
+    } catch { /* chart not ready yet */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candles, liveCandle, onOhlcChange]);
 
   // ── Live candle update — no full re-render, just series.update() ──────────
   useEffect(() => {
@@ -163,9 +170,8 @@ export function CandlestickChart({ candles, liveCandle, interval, onIntervalChan
     try {
       seriesRef.current.update({ time: t, open: liveCandle.open, high: liveCandle.high, low: liveCandle.low, close: liveCandle.close });
       volSeriesRef.current.update({ time: t, value: liveCandle.volume, color: liveCandle.close >= liveCandle.open ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)" });
-      onOhlcChange?.({ open: liveCandle.open, high: liveCandle.high, low: liveCandle.low, close: liveCandle.close, time: t });
     } catch { /* chart may not be ready yet */ }
-  }, [liveCandle, onOhlcChange]);
+  }, [liveCandle]);
 
   return (
     <div className="dsChartWrap">

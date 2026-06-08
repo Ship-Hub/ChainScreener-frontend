@@ -30,7 +30,7 @@ export default async function Launches() {
 
   // Run both API calls in parallel so the total SSR latency = max(launches, by-platform).
   const [launchJson, platformJson] = await Promise.all([
-    safeFetch(`${api}/api/launches?limit=100&maxAgeDays=7`, 2_500),
+    safeFetch(`${api}/api/launches?limit=100&maxAgeDays=7&minVolume=10`, 2_500),
     safeFetch(`${api}/api/launches/by-platform`, 1_200),
   ]);
 

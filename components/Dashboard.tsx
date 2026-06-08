@@ -206,7 +206,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
     };
 
     poll();
-    const id = setInterval(poll, Math.round(15_000 / speed));
+    const     id = setInterval(poll, Math.round(30_000 / speed));
     return () => {
       active = false;
       clearInterval(id);
