@@ -7,7 +7,7 @@ export const metadata = { title: "Launches — Chain Screener" };
  * Fetch JSON from the API with a hard timeout.  Returns null on any error so
  * the page still renders (client-side refresh will populate data shortly after).
  */
-async function safeFetch(url: string, timeoutMs = 5_000): Promise<unknown> {
+async function safeFetch(url: string, timeoutMs = 2_500): Promise<unknown> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -30,16 +30,14 @@ export default async function Launches() {
 
   // Run both API calls in parallel so the total SSR latency = max(launches, by-platform).
   const [launchJson, platformJson] = await Promise.all([
-    safeFetch(`${api}/api/launches`),
-    safeFetch(`${api}/api/launches/by-platform`),
+    safeFetch(`${api}/api/launches?limit=80`, 2_500),
+    safeFetch(`${api}/api/launches/by-platform`, 1_200),
   ]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initialTokens: any[] =
+  const initialTokens =
     (launchJson as { data?: unknown[] } | null)?.data ?? [];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const initialPlatformTokens: Record<string, any[]> =
+  const initialPlatformTokens =
     platformJson && typeof platformJson === "object" && !Array.isArray(platformJson)
       ? (platformJson as Record<string, unknown[]>)
       : {};

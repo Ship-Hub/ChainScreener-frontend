@@ -1233,24 +1233,46 @@ export function LaunchesPage({ initialTokens = [], initialPlatformTokens = {} }:
 
   useEffect(() => {
     const api = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+    const fetchJsonWithTimeout = async (url: string, timeoutMs: number) => {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) return null;
+        return response.json();
+      } catch {
+        return null;
+      } finally {
+        window.clearTimeout(timer);
+      }
+    };
 
     // Core fetch — showLoading controls whether we display the loading spinner.
     // Background refreshes run silently so the existing data stays visible.
     const doFetch = (showLoading: boolean) => {
       if (showLoading) setLoading(true);
-      Promise.all([
-        fetch(`${api}/api/launches`).then(r => r.json()),
-        fetch(`${api}/api/launches/by-platform`).then(r => r.json()),
-        fetch(`${api}/api/alerts/counts`).then(r => r.json()).catch(() => ({ data: {} })),
-      ])
-        .then(([launchData, platformData, alertData]) => {
-          setRawTokens(launchData.data ?? []);
-          setPlatformTokens(platformData ?? {});
-          const counts = alertData.data ?? alertData ?? {};
-          setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
+
+      fetchJsonWithTimeout(`${api}/api/launches?limit=80`, showLoading ? 5_000 : 8_000)
+        .then((launchData) => {
+          if (launchData && typeof launchData === "object" && "data" in launchData) {
+            setRawTokens((launchData as { data?: TokenSummary[] }).data ?? []);
+          }
         })
-        .catch(() => {})
         .finally(() => { if (showLoading) setLoading(false); });
+
+      void fetchJsonWithTimeout(`${api}/api/launches/by-platform`, 4_000)
+        .then((platformData) => {
+          if (platformData && typeof platformData === "object" && !Array.isArray(platformData)) {
+            setPlatformTokens(platformData as Record<string, TokenSummary[]>);
+          }
+        });
+
+      void fetchJsonWithTimeout(`${api}/api/alerts/counts`, 2_500)
+        .then((alertData) => {
+          if (!alertData || typeof alertData !== "object") return;
+          const counts = "data" in alertData ? (alertData as { data?: Record<string, number> }).data ?? {} : alertData;
+          setAlertCount(Object.values(counts as Record<string, number>).reduce((s, n) => s + n, 0));
+        });
     };
 
     // If the SSR pass already gave us data, skip the initial spinner fetch; otherwise fetch now.
