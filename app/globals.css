@@ -363,7 +363,7 @@ input:focus-visible {
   grid-column: 2 / 4;
   height: 46px;
   display: grid;
-  grid-template-columns: 116px minmax(0, 1fr) 110px;
+  grid-template-columns: 100px minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -396,7 +396,7 @@ input:focus-visible {
   height: 100%;
   display: flex;
   align-items: center;
-  animation: tickerScroll 72s linear infinite;
+  animation: tickerScroll 140s linear infinite;
 }
 
 .trendingTicker:hover .tickerRail {
@@ -412,6 +412,14 @@ input:focus-visible {
   background: transparent;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.tickerRank {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--faint);
+  min-width: 14px;
+  text-align: right;
 }
 
 .tickerToken strong {
@@ -1879,6 +1887,10 @@ input:focus-visible {
   gap: 5px;
   font-size: 10px;
   color: var(--muted);
+  cursor: default;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.1s;
 }
 
 .spLegendItem i {
@@ -1892,6 +1904,18 @@ input:focus-visible {
   margin-left: auto;
   font-weight: 700;
   color: var(--text);
+}
+
+.spLegendItem em {
+  font-style: normal;
+  font-size: 9px;
+  color: var(--faint);
+  margin-left: 3px;
+}
+
+.spLegendItem.active,
+.spLegendItem:hover {
+  background: oklch(0.18 0.025 255);
 }
 
 /* Sections */
@@ -2042,6 +2066,10 @@ input:focus-visible {
   grid-template-columns: 36px 1fr 44px;
   align-items: center;
   gap: 8px;
+  cursor: default;
+  padding: 3px 0;
+  border-radius: 4px;
+  transition: background 0.1s;
 }
 
 .spVolBarLabel {
@@ -2068,6 +2096,38 @@ input:focus-visible {
   font-size: 10px;
   color: var(--muted);
   text-align: right;
+}
+
+.spVolBar:hover {
+  background: oklch(0.16 0.02 255 / 0.5);
+}
+
+.spVolBar:hover .spVolBarFill {
+  filter: brightness(1.2);
+}
+
+/* Bubble tooltip */
+.spBubbleTooltip {
+  z-index: 999;
+  background: oklch(0.16 0.025 258);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 140px;
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.5);
+}
+
+.spBubbleTooltip strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.spBubbleTooltip span {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* Bubble plot legend */

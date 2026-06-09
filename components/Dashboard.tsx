@@ -497,24 +497,27 @@ function Sidebar({ activeItem, pendingItem, onNavigate }: {
 }
 
 function TrendingTicker({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: (token: RadarToken) => void }) {
-  const router = useRouter();
-  const tickerTokens = [...tokens, ...tokens, ...tokens];
+  const base = tokens.slice(0, 20);
+  const tickerTokens = [...base, ...base, ...base];
   return (
     <section className="trendingTicker" aria-label="Trending tokens">
-      <div className="tickerLead"><TrendingUp size={15} /> Trending <ChevronDown size={13} /></div>
+      <div className="tickerLead"><TrendingUp size={15} /> Trending</div>
       <div className="tickerViewport">
         <div className="tickerRail">
-          {tickerTokens.map((token, index) => (
-            <button className="tickerToken" key={`${token.address}-${index}`} type="button" onClick={() => onSelect(token)}>
-              <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
-              <strong>{token.ticker}</strong>
-              <span className={token.priceChange24h >= 0 ? "positive" : "negative"}>{signedPct(token.priceChange24h)}</span>
-              <small>{money(token.volume24hUsd)}</small>
-            </button>
-          ))}
+          {tickerTokens.map((token, index) => {
+            const rank = (index % base.length) + 1;
+            return (
+              <button className="tickerToken" key={`${token.address}-${index}`} type="button" onClick={() => onSelect(token)}>
+                <span className="tickerRank">{rank}</span>
+                <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
+                <strong>{token.ticker}</strong>
+                <span className={token.priceChange24h >= 0 ? "positive" : "negative"}>{signedPct(token.priceChange24h)}</span>
+                <small>{money(token.volume24hUsd)}</small>
+              </button>
+            );
+          })}
         </div>
       </div>
-      <button className="viewAllButton" type="button" onClick={() => { dispatchNavStart(); router.push("/launches"); }}>View all <ArrowRight size={15} /></button>
     </section>
   );
 }
@@ -806,30 +809,20 @@ function MarketStatsPanel({
         </div>
       </div>
 
-      {/* Donut pair */}
+      {/* Donut pair — hover legend items to highlight segment + update center */}
       <div className="spDonutRow">
-        <div className="spDonut">
-          <span className="spDonutTitle">Risk Mix</span>
-          <DonutChart segments={riskSegments} centerLabel={`${tokens.length}`} centerSub="tokens" />
-          <div className="spDonutLegend">
-            {riskSegments.filter((s) => s.value > 0).map((s) => (
-              <span key={s.label} className="spLegendItem">
-                <i style={{ background: s.color }} />{s.label} <b>{s.value}</b>
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="spDonut">
-          <span className="spDonutTitle">Chain Split</span>
-          <DonutChart segments={chainSegments} centerLabel={money(totalVolume)} centerSub="vol" />
-          <div className="spDonutLegend">
-            {chainSegments.filter((s) => s.value > 0).map((s) => (
-              <span key={s.label} className="spLegendItem">
-                <i style={{ background: s.color }} />{s.label} <b>{money(s.value)}</b>
-              </span>
-            ))}
-          </div>
-        </div>
+        <DonutCard
+          title="Risk Mix"
+          segments={riskSegments}
+          centerLabel={`${tokens.length}`}
+          centerSub="tokens"
+        />
+        <DonutCard
+          title="Chain Split"
+          segments={chainSegments}
+          centerLabel={money(totalVolume)}
+          centerSub="vol"
+        />
       </div>
 
       {/* Volume by Chain bar chart */}
@@ -839,12 +832,12 @@ function MarketStatsPanel({
           {chainSegments.map((seg) => {
             const pct = totalVolume > 0 ? (seg.value / totalVolume) * 100 : 0;
             return (
-              <div key={seg.label} className="spVolBar">
+              <div key={seg.label} className="spVolBar" title={`${seg.label}: ${money(seg.value)} (${pct.toFixed(1)}% of total)`}>
                 <span className="spVolBarLabel">{seg.label}</span>
                 <div className="spVolBarTrack">
                   <div className="spVolBarFill" style={{ width: `${pct}%`, background: seg.color }} />
                 </div>
-                <span className="spVolBarValue">{money(seg.value)}</span>
+                <span className="spVolBarValue">{pct > 0 ? `${pct.toFixed(0)}%` : "—"}</span>
               </div>
             );
           })}
@@ -960,12 +953,59 @@ function MarketStatsPanel({
   );
 }
 
-function DonutChart({
+function DonutCard({
+  title,
   segments,
   centerLabel,
   centerSub,
 }: {
+  title: string;
   segments: DonutSegment[];
+  centerLabel: string;
+  centerSub: string;
+}) {
+  const [hovered, setHovered] = useState<string | null>(null);
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  const hSeg = hovered ? segments.find(s => s.label === hovered) : null;
+
+  return (
+    <div className="spDonut">
+      <span className="spDonutTitle">{title}</span>
+      <DonutChart
+        segments={segments}
+        highlightLabel={hovered ?? undefined}
+        centerLabel={hSeg ? String(hSeg.value) : centerLabel}
+        centerSub={hSeg
+          ? `${hSeg.label} · ${total > 0 ? Math.round((hSeg.value / total) * 100) : 0}%`
+          : centerSub}
+      />
+      <div className="spDonutLegend">
+        {segments.filter(s => s.value > 0).map(s => (
+          <span
+            key={s.label}
+            className={`spLegendItem ${hovered === s.label ? "active" : ""}`}
+            onMouseEnter={() => setHovered(s.label)}
+            onMouseLeave={() => setHovered(null)}
+          >
+            <i style={{ background: s.color }} />
+            {s.label}
+            <b>{s.value}</b>
+            {total > 0 && <em>{Math.round((s.value / total) * 100)}%</em>}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DonutChart({
+  segments,
+  highlightLabel,
+  centerLabel,
+  centerSub,
+}: {
+  segments: DonutSegment[];
+  highlightLabel?: string;
   centerLabel: string;
   centerSub: string;
 }) {
@@ -1013,6 +1053,8 @@ function DonutChart({
           strokeLinecap="butt"
           strokeDasharray={`${arc.dash} ${circumference - arc.dash}`}
           strokeDashoffset={arc.offset}
+          opacity={highlightLabel ? (arc.label === highlightLabel ? 1 : 0.2) : 1}
+          style={{ transition: "opacity 0.15s" }}
         />
       ))}
       {/* Gap ring for visual separation between segments */}
@@ -1047,6 +1089,8 @@ const RADAR_TYPE_COLOR: Record<RadarType, string> = {
 };
 
 function BubblePlot({ tokens, onTokenClick }: { tokens: RadarToken[]; onTokenClick: (t: RadarToken) => void }) {
+  const [tooltip, setTooltip] = useState<{ token: RadarToken; x: number; y: number } | null>(null);
+
   if (tokens.length === 0) {
     return <div className="spEmpty" style={{ padding: "20px 0" }}>No token data — run indexer</div>;
   }
@@ -1064,10 +1108,24 @@ function BubblePlot({ tokens, onTokenClick }: { tokens: RadarToken[]; onTokenCli
   const yTicks = [0, 0.5, 1];
 
   return (
+    <div style={{ position: "relative" }}>
+    {tooltip && (
+      <div
+        className="spBubbleTooltip"
+        style={{ position: "fixed", left: tooltip.x + 14, top: tooltip.y - 54, pointerEvents: "none" }}
+      >
+        <strong>{tooltip.token.ticker}</strong>
+        <span>{tooltip.token.chain.toUpperCase()} · {tooltip.token.age} old</span>
+        <span>Vol: {money(tooltip.token.volume24hUsd)}</span>
+        <span>MCap: {money(tooltip.token.marketCapUsd)}</span>
+        <span className={tooltip.token.priceChange1h >= 0 ? "positive" : "negative"}>{signedPct(tooltip.token.priceChange1h)} 1h</span>
+      </div>
+    )}
     <svg
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: "100%", height: "auto", display: "block" }}
       aria-label="Age vs Volume bubble chart"
+      onMouseLeave={() => setTooltip(null)}
     >
       {/* Grid */}
       {[0.25, 0.5, 0.75, 1].map(f => {
@@ -1110,18 +1168,19 @@ function BubblePlot({ tokens, onTokenClick }: { tokens: RadarToken[]; onTokenCli
             key={t.id}
             cx={cx} cy={cy} r={r}
             fill={color}
-            fillOpacity={0.6}
+            fillOpacity={tooltip?.token.id === t.id ? 0.9 : 0.6}
             stroke={color}
-            strokeWidth={1}
+            strokeWidth={tooltip?.token.id === t.id ? 2 : 1}
             strokeOpacity={0.9}
-            style={{ cursor: "pointer" }}
+            style={{ cursor: "pointer", transition: "fill-opacity 0.1s" }}
             onClick={() => onTokenClick(t)}
-          >
-            <title>{t.ticker} · {t.age} · {money(t.volume24hUsd)}</title>
-          </circle>
+            onMouseEnter={(e) => setTooltip({ token: t, x: e.clientX, y: e.clientY })}
+            onMouseMove={(e) => setTooltip(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null)}
+          />
         );
       })}
     </svg>
+    </div>
   );
 }
 
@@ -1290,7 +1349,7 @@ function LatestLaunchesCard({ tokens, onSelect }: { tokens: RadarToken[]; onSele
             </tr>
           </thead>
           <tbody>
-            {tokens.slice(0, 20).map((token, index) => (
+            {tokens.slice(0, 50).map((token, index) => (
               <tr key={token.address} onClick={() => onSelect(token)} style={{ cursor: "pointer" }}>
                 <td>
                   <span className="rank">{index + 1}</span>
