@@ -10,7 +10,6 @@ import {
   Check,
   ChevronDown,
   CircleDollarSign,
-  Copy,
   Crosshair,
   Database,
   Droplets,
@@ -40,8 +39,8 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { dispatchNavStart } from "./NavigationProgress";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import type { Candle, ChainKey, LivePool, LiveSwap, RiskLevel, TokenSummary } from "../lib/types";
-import { fetchLiveData, fetchTokenCandles, fetchTokenSwaps, subscribeLiveFeed } from "../lib/api";
+import type { ChainKey, LivePool, LiveSwap, RiskLevel, TokenSummary } from "../lib/types";
+import { fetchLiveData, subscribeLiveFeed } from "../lib/api";
 import { MobileBottomNav } from "./MobileBottomNav";
 
 type DashboardProps = {
@@ -70,10 +69,9 @@ type RadarToken = TokenSummary & {
 };
 
 
-type RightPanel = "token" | "watchlist" | "coming-soon";
+type RightPanel = "stats" | "watchlist" | "coming-soon";
 
 const chainOptions: Array<"all" | ChainKey> = ["all", "base", "eth", "bsc"];
-const timeframes = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
 const navSections = [
   {
@@ -145,27 +143,14 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
   const [speed, setSpeed] = useState<0.5 | 1 | 2 | 5>(1);
   const [filterRisks, setFilterRisks] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [rightPanel, setRightPanel] = useState<RightPanel>("token");
+  const [rightPanel, setRightPanel] = useState<RightPanel>("stats");
   const [activeNav, setActiveNav] = useState("Radar");
   const [comingSoonLabel, setComingSoonLabel] = useState("");
   // Tracks which sidebar item is mid-navigation so we can show a pending state
   const [pendingNav, setPendingNav] = useState<string | null>(null);
 
-  // Starred tokens — persisted to localStorage
-  const [starred, setStarred] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    try { const s = localStorage.getItem("cs:starred"); if (s) setStarred(JSON.parse(s)); } catch {}
-  }, []);
-
   // Clear the sidebar loading indicator once the new route has mounted
   useEffect(() => { setPendingNav(null); }, [pathname]);
-  const toggleStar = useCallback((id: string) => {
-    setStarred(prev => {
-      const next = { ...prev, [id]: !prev[id] };
-      try { localStorage.setItem("cs:starred", JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     if (!live) return;
@@ -216,18 +201,14 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
 
   const radarTokens = useMemo(() => enrichTokens(tokens), [tokens]);
   const trendingTokens = useMemo(() => enrichTokens(tokens.length ? tokens : initialTrending), [tokens, initialTrending]);
-  const [selected, setSelected] = useState<RadarToken | undefined>(radarTokens[0]);
-
-  const showTokenInPanel = useCallback((token: RadarToken) => {
-    setSelected(token);
-    setRightPanel("token");
-    setActiveNav("Radar");
-  }, []);
 
   const openTokenPage = useCallback((token: RadarToken) => {
     dispatchNavStart();
     router.push(`/token/${token.chain}/${token.address}`);
   }, [router]);
+
+  // All token interactions navigate directly to the dedicated token page
+  const showTokenInPanel = openTokenPage;
 
   const openWatchlist = useCallback(() => {
     setRightPanel("watchlist");
@@ -256,7 +237,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
       return;
     }
     if (label === "Watchlist") { openWatchlist(); return; }
-    if (label === "Radar")     { setRightPanel("token"); }
+    if (label === "Radar")     { setRightPanel("stats"); }
     setActiveNav(label);
   }, [router, openWatchlist, pendingNav]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -274,9 +255,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
     return list;
   }, [radarTokens, chain, filterRisks, searchQuery]);
 
-  const selectedToken = selected && visibleTokens.some((t) => t.address === selected.address)
-    ? selected
-    : visibleTokens[0];
+  const topToken = visibleTokens[0];
 
   return (
     <AppShell>
@@ -294,7 +273,7 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
         <main className="radarWorkspace">
           <LaunchRadar
             tokens={visibleTokens}
-            selected={selectedToken}
+            selected={topToken}
             chain={chain}
             live={live}
             speed={speed}
@@ -307,22 +286,14 @@ export function Dashboard({ initialTokens, initialTrending, initialLivePools, in
           />
           <section className="lowerGrid" aria-label="Launch intelligence">
             <LatestLaunchesCard tokens={visibleTokens} onSelect={showTokenInPanel} />
-            <SmartMoneyFlowCard swaps={liveSwaps} />
-            <RadarInsightsCard selected={selectedToken} tokens={visibleTokens} />
-            <LivePoolsCard pools={livePools} tokens={visibleTokens} />
+            <HighConvictionCard tokens={visibleTokens} onSelect={showTokenInPanel} />
           </section>
         </main>
         {rightPanel === "watchlist"
-          ? <WatchlistPanel onClose={() => { setRightPanel("token"); setActiveNav("Radar"); }} />
+          ? <WatchlistPanel onClose={() => { setRightPanel("stats"); setActiveNav("Radar"); }} />
           : rightPanel === "coming-soon"
-          ? <ComingSoonPanel label={comingSoonLabel} onClose={() => { setRightPanel("token"); setActiveNav("Radar"); }} />
-          : <TokenDetailPanel
-              token={selectedToken}
-              onOpenPage={openTokenPage}
-              onClose={() => setSelected(undefined)}
-              starred={starred}
-              onToggleStar={toggleStar}
-            />
+          ? <ComingSoonPanel label={comingSoonLabel} onClose={() => { setRightPanel("stats"); setActiveNav("Radar"); }} />
+          : <MarketStatsPanel tokens={visibleTokens} liveSwaps={liveSwaps} onTokenClick={openTokenPage} />
         }
       </div>
     </AppShell>
@@ -750,126 +721,407 @@ function RadarTooltip({ token }: { token: RadarToken }) {
   );
 }
 
-function TokenDetailPanel({ token, onOpenPage, onClose, starred, onToggleStar }: {
-  token?: RadarToken;
-  onOpenPage: (token: RadarToken) => void;
-  onClose: () => void;
-  starred: Record<string, boolean>;
-  onToggleStar: (id: string) => void;
+type DonutSegment = { label: string; value: number; color: string };
+
+function MarketStatsPanel({
+  tokens,
+  liveSwaps,
+  onTokenClick,
+}: {
+  tokens: RadarToken[];
+  liveSwaps: LiveSwap[];
+  onTokenClick: (token: RadarToken) => void;
 }) {
-  const [timeframe, setTimeframe] = useState("1h");
-  const [copied, setCopied] = useState(false);
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [poolAddress, setPoolAddress] = useState<string | null>(null);
+  const router = useRouter();
 
-  useEffect(() => {
-    if (!token) { setCandles([]); return; }
-    fetchTokenCandles(token.chain, token.address, timeframe).then(setCandles);
-  }, [token?.chain, token?.address, timeframe]);
+  // Market-wide aggregates
+  const totalVolume = tokens.reduce((s, t) => s + t.volume24hUsd, 0);
+  const totalBuys = tokens.reduce((s, t) => s + t.buys, 0);
+  const totalSells = tokens.reduce((s, t) => s + t.sells, 0);
+  const totalSwaps = totalBuys + totalSells;
+  const buyPct = totalSwaps > 0 ? Math.round((totalBuys / totalSwaps) * 100) : 50;
+  const sentiment = buyPct >= 55 ? "bullish" : buyPct <= 45 ? "bearish" : "neutral";
 
-  useEffect(() => {
-    if (!token) { setPoolAddress(null); return; }
-    fetchTokenSwaps(token.chain, token.address, 1).then((swaps) => {
-      setPoolAddress(swaps[0]?.poolAddress ?? null);
-    });
-  }, [token?.chain, token?.address]);
+  // Risk distribution donut segments
+  const riskSegments: DonutSegment[] = [
+    { label: "Low",    value: tokens.filter((t) => t.riskLevel === "Low").length,     color: "oklch(0.62 0.22 151)" },
+    { label: "Med",    value: tokens.filter((t) => t.riskLevel === "Medium").length,  color: "oklch(0.78 0.17 85)"  },
+    { label: "High",   value: tokens.filter((t) => t.riskLevel === "High").length,    color: "oklch(0.62 0.22 25)"  },
+    { label: "Ext",    value: tokens.filter((t) => t.riskLevel === "Extreme").length, color: "oklch(0.48 0.18 25)"  },
+  ];
 
-  const copyAddress = useCallback(() => {
-    if (!token) return;
-    navigator.clipboard.writeText(token.address).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [token]);
+  // Chain volume split donut segments
+  const chainVols: Record<string, number> = {};
+  tokens.forEach((t) => { chainVols[t.chain] = (chainVols[t.chain] ?? 0) + t.volume24hUsd; });
+  const chainSegments: DonutSegment[] = [
+    { label: "Base", value: chainVols["base"] ?? 0, color: "oklch(0.62 0.22 220)" },
+    { label: "ETH",  value: chainVols["eth"]  ?? 0, color: "oklch(0.68 0.16 285)" },
+    { label: "BSC",  value: chainVols["bsc"]  ?? 0, color: "oklch(0.78 0.17 85)"  },
+  ];
 
-  if (!token) {
-    return <aside className="tokenPanel emptyPanel">Select a token</aside>;
-  }
+  // Radar insights
+  const highRisk = tokens.filter((t) => t.riskLevel === "High" || t.riskLevel === "Extreme").length;
+  const topGainer = tokens.length > 0
+    ? [...tokens].sort((a, b) => b.priceChange1h - a.priceChange1h)[0]
+    : null;
+  const totalLiquidity = tokens.reduce((s, t) => s + t.liquidityUsd, 0);
+  const marketBullish = buyPct >= 55;
 
   return (
-    <aside className="tokenPanel">
-      <div className="tokenPanelHead">
-        <TokenLogo label={token.ticker} tone="cyan" large />
-        <div>
-          <strong>{token.ticker}</strong>
-          <span>{token.name}</span>
-          <div className="badgeRow">
-            <ChainBadge chain={token.chain} />
-            <LaunchSourceBadge source={token.launchSource} />
+    <aside className="tokenPanel statsPanel">
+      {/* Header */}
+      <div className="spHead">
+        <span className="spTitle">Market Pulse</span>
+        <span className="spLive"><i className="spLiveOrb" />Live</span>
+      </div>
+
+      {/* Pulse strip */}
+      <div className="spPulse">
+        <div className="spPulseStat">
+          <span>Tokens</span>
+          <strong>{tokens.length}</strong>
+          <small>tracked</small>
+        </div>
+        <div className="spPulseStat">
+          <span>Volume 24h</span>
+          <strong>{money(totalVolume)}</strong>
+          <small>combined</small>
+        </div>
+        <div className="spPulseStat">
+          <span>Buy Side</span>
+          <strong className={buyPct >= 50 ? "positive" : "negative"}>{buyPct}%</strong>
+          <small>{sentiment}</small>
+        </div>
+      </div>
+
+      {/* Buy/Sell pressure bar */}
+      <div className="spPressure">
+        <div className="spPressureBar">
+          <div className="spPressureBuy" style={{ width: `${buyPct}%` }} />
+          <div className="spPressureSell" />
+        </div>
+        <div className="spPressureLabels">
+          <span className="positive">{totalBuys.toLocaleString()} buys</span>
+          <span className="negative">{totalSells.toLocaleString()} sells</span>
+        </div>
+      </div>
+
+      {/* Donut pair */}
+      <div className="spDonutRow">
+        <div className="spDonut">
+          <span className="spDonutTitle">Risk Mix</span>
+          <DonutChart segments={riskSegments} centerLabel={`${tokens.length}`} centerSub="tokens" />
+          <div className="spDonutLegend">
+            {riskSegments.filter((s) => s.value > 0).map((s) => (
+              <span key={s.label} className="spLegendItem">
+                <i style={{ background: s.color }} />{s.label} <b>{s.value}</b>
+              </span>
+            ))}
           </div>
         </div>
-        <button
-          className={`panelIcon ${starred[token.id] ? "starred" : ""}`}
-          type="button"
-          aria-label={starred[token.id] ? "Remove from watchlist" : "Add to watchlist"}
-          onClick={() => onToggleStar(token.id)}
-        >
-          <Star size={18} fill={starred[token.id] ? "currentColor" : "none"} />
-        </button>
-        <button className="panelIcon" type="button" aria-label="Close token panel" onClick={onClose}><X size={18} /></button>
-      </div>
-
-      {/* Contract address */}
-      <div className="contractRow">
-        <span>Contract</span>
-        <a className="contractAddress" href={addressUrl(token.chain, token.address)} target="_blank" rel="noopener noreferrer" title={token.address}>
-          {shortAddress(token.address)}
-        </a>
-        <button type="button" className="copyButton" onClick={copyAddress} aria-label="Copy contract address">
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-        </button>
-        <a className="copyButton" href={addressUrl(token.chain, token.address)} target="_blank" rel="noopener noreferrer" aria-label="View on explorer">
-          <ExternalLink size={13} />
-        </a>
-      </div>
-
-      {/* Pair address */}
-      {poolAddress && (
-        <div className="contractRow" style={{ marginTop: 6 }}>
-          <span>Pair</span>
-          <a className="contractAddress" href={addressUrl(token.chain, poolAddress)} target="_blank" rel="noopener noreferrer" title={poolAddress}>
-            {shortAddress(poolAddress)}
-          </a>
-          <a className="copyButton" href={addressUrl(token.chain, poolAddress)} target="_blank" rel="noopener noreferrer" aria-label="View pair on explorer">
-            <ExternalLink size={13} />
-          </a>
+        <div className="spDonut">
+          <span className="spDonutTitle">Chain Split</span>
+          <DonutChart segments={chainSegments} centerLabel={money(totalVolume)} centerSub="vol" />
+          <div className="spDonutLegend">
+            {chainSegments.filter((s) => s.value > 0).map((s) => (
+              <span key={s.label} className="spLegendItem">
+                <i style={{ background: s.color }} />{s.label} <b>{money(s.value)}</b>
+              </span>
+            ))}
+          </div>
         </div>
-      )}
-
-      <div className="priceBlock">
-        <strong>${token.priceUsd.toFixed(token.priceUsd < 0.01 ? 6 : 4)}</strong>
-        <span className={token.priceChange24h >= 0 ? "positive" : "negative"}>{signedPct(token.priceChange24h)}</span>
-        <em><i /> Live</em>
       </div>
 
-      <div className="metricStrip">
-        <DetailStat label="Market Cap" value={money(token.marketCapUsd)} />
-        <DetailStat label="Volume (24H)" value={money(token.volume24hUsd)} />
-        <DetailStat label="Liquidity" value={money(token.liquidityUsd)} />
-        <DetailStat label="Holders" value={compact(token.holders)} />
+      {/* Volume by Chain bar chart */}
+      <div className="spSection">
+        <h3 className="spSectionTitle"><Database size={13} />Volume by Chain</h3>
+        <div className="spVolBars">
+          {chainSegments.map((seg) => {
+            const pct = totalVolume > 0 ? (seg.value / totalVolume) * 100 : 0;
+            return (
+              <div key={seg.label} className="spVolBar">
+                <span className="spVolBarLabel">{seg.label}</span>
+                <div className="spVolBarTrack">
+                  <div className="spVolBarFill" style={{ width: `${pct}%`, background: seg.color }} />
+                </div>
+                <span className="spVolBarValue">{money(seg.value)}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="timeframeRow">
-        {timeframes.map((item) => (
-          <button className={timeframe === item ? "selected" : ""} key={item} type="button" onClick={() => setTimeframe(item)}>{item}</button>
-        ))}
+      {/* Age vs Volume bubble plot */}
+      <div className="spSection">
+        <h3 className="spSectionTitle"><Activity size={13} />Age vs Volume</h3>
+        <BubblePlot tokens={tokens} onTokenClick={onTokenClick} />
+        <div className="spBubbleLegend">
+          {(["healthy", "watch", "smart-money", "viral", "high-risk"] as RadarType[]).map((type) => (
+            <span key={type} className="spBubbleLegendItem">
+              <i className={`spBubbleDot ${type}`} />{type.replace("-", " ")}
+            </span>
+          ))}
+        </div>
       </div>
 
-      <MiniCandlestickChart token={token} candles={candles} />
-
-      <div className="signalGrid">
-        <GaugeCard label="Risk Score" value={token.riskScore} caption={`${token.riskLevel} Risk`} tone={riskTone(token.riskLevel)} />
-        <GaugeCard label="Buyer Pressure" value={buyerPressure(token)} caption="Current" tone="cyan" />
-        <SignalCard label="Smart Money Interest" value={token.smartWalletBuys > 12 ? "High" : "Building"} detail={`${token.smartWalletBuys} wallets`} tone="green" />
-        <SignalCard label="Holder Growth (24H)" value={`+${token.holderGrowth.toFixed(1)}%`} detail={`${compact(token.holders)} holders`} tone="green" />
-        <SignalCard label="Launch Source" value={token.launchSource} detail={`${token.chain.toUpperCase()} discovery`} tone="cyan" />
-        <SignalCard label="Est. Lock" value={`${token.liquidityLocked}%`} detail={token.liquidityLocked > 80 ? "Strong lock" : "Monitor"} tone="green" />
+      {/* Radar Insights */}
+      <div className="spSection">
+        <h3 className="spSectionTitle"><Gauge size={13} />Radar Insights</h3>
+        <div className="spInsightList">
+          <div className={`spInsight ${topGainer && topGainer.priceChange1h > 0 ? "green" : "red"}`}>
+            <span><TrendingUp size={14} /></span>
+            <div>
+              <strong>
+                {topGainer
+                  ? `${topGainer.ticker} ${topGainer.priceChange1h >= 0 ? "up" : "down"} ${Math.abs(topGainer.priceChange1h).toFixed(1)}% (1h)`
+                  : "No price data yet"}
+              </strong>
+              <small>
+                {topGainer
+                  ? `Vol: ${money(topGainer.volume24hUsd)} · ${topGainer.buys}B / ${topGainer.sells}S`
+                  : "Run indexer to populate"}
+              </small>
+            </div>
+          </div>
+          <div className={`spInsight ${highRisk > 0 ? "red" : "green"}`}>
+            <span><AlertTriangle size={14} /></span>
+            <div>
+              <strong>
+                {tokens.length === 0
+                  ? "No tokens indexed yet"
+                  : highRisk > 0
+                    ? `${highRisk} high-risk token${highRisk > 1 ? "s" : ""} detected`
+                    : "No high-risk tokens in view"}
+              </strong>
+              <small>
+                {tokens.length > 0
+                  ? `${tokens.length} scanned · ${tokens.filter(t => t.riskLevel === "Low").length} low-risk`
+                  : "Waiting for indexer data"}
+              </small>
+            </div>
+          </div>
+          <div className={`spInsight ${marketBullish ? "cyan" : "amber"}`}>
+            <span><Droplets size={14} /></span>
+            <div>
+              <strong>
+                {totalSwaps > 0
+                  ? `${buyPct}% buy pressure · ${marketBullish ? "Bullish" : "Bearish"}`
+                  : "Awaiting swap data"}
+              </strong>
+              <small>
+                {totalLiquidity > 0
+                  ? `${money(totalLiquidity)} liquidity · ${totalSwaps} swaps`
+                  : totalSwaps > 0
+                    ? `${totalBuys} buys · ${totalSells} sells`
+                    : "Run indexer to see signals"}
+              </small>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <button className="primaryAction" type="button" onClick={() => onOpenPage(token)}>
-        View Full Intelligence <ArrowRight size={16} />
-      </button>
+      {/* Smart Money Flow */}
+      <div className="spSection">
+        <h3 className="spSectionTitle"><Wallet size={13} />Smart Money Flow</h3>
+        <div className="spSwapList">
+          {liveSwaps.length === 0 ? (
+            <div className="spEmpty">No swap data yet — run indexer</div>
+          ) : liveSwaps.slice(0, 8).map((swap) => {
+            const t0 = resolvedSymbol(swap.token0Symbol, swap.token0 ?? swap.poolAddress ?? "");
+            const t1 = resolvedSymbol(swap.token1Symbol, swap.token1 ?? "");
+            const pair = t1 && t1 !== "ETH" ? `${t0}/${t1}` : t0;
+            const walletAddr = swap.sender ?? swap.txHash;
+            const isFullAddr = /^0x[a-fA-F0-9]{40}$/.test(walletAddr);
+            const isBuy = swap.amount0Raw.startsWith("-");
+            return (
+              <div className="spSwapRow" key={`${swap.chain}-${swap.txHash}-${swap.blockNumber}`}>
+                <span className={`spSwapBadge ${isBuy ? "buy" : "sell"}`}>{isBuy ? "B" : "S"}</span>
+                <div className="spSwapBody">
+                  <strong>{pair}</strong>
+                  <button
+                    type="button"
+                    className="spSwapWallet"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isFullAddr) router.push(`/wallet/${walletAddr}`);
+                      else window.open(addressUrl(swap.chain, walletAddr), "_blank");
+                    }}
+                  >
+                    {shortAddress(walletAddr)}
+                  </button>
+                </div>
+                <span className="spSwapChain">{swap.chain}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </aside>
+  );
+}
+
+function DonutChart({
+  segments,
+  centerLabel,
+  centerSub,
+}: {
+  segments: DonutSegment[];
+  centerLabel: string;
+  centerSub: string;
+}) {
+  const size = 90;
+  const r = 30;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * r;
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+
+  let accumulated = 0;
+  const arcs = total === 0
+    ? []
+    : segments
+        .filter((s) => s.value > 0)
+        .map((seg) => {
+          const dash = (seg.value / total) * circumference;
+          const offset = circumference / 4 - accumulated;
+          accumulated += dash;
+          return { ...seg, dash, offset };
+        });
+
+  return (
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      width={size}
+      height={size}
+      style={{ display: "block", overflow: "visible" }}
+      aria-hidden="true"
+    >
+      {arcs.length === 0 ? (
+        <circle
+          cx={cx} cy={cy} r={r}
+          fill="none"
+          stroke="oklch(0.22 0.02 255)"
+          strokeWidth="10"
+        />
+      ) : arcs.map((arc, i) => (
+        <circle
+          key={i}
+          cx={cx} cy={cy} r={r}
+          fill="none"
+          stroke={arc.color}
+          strokeWidth="10"
+          strokeLinecap="butt"
+          strokeDasharray={`${arc.dash} ${circumference - arc.dash}`}
+          strokeDashoffset={arc.offset}
+        />
+      ))}
+      {/* Gap ring for visual separation between segments */}
+      {arcs.length > 1 && (
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="oklch(0.11 0.015 258)" strokeWidth="2" />
+      )}
+      <text
+        x={cx} y={cy - 3}
+        textAnchor="middle"
+        dominantBaseline="auto"
+        style={{ fontSize: 11, fontWeight: 800, fill: "var(--text)", fontFamily: "inherit" }}
+      >
+        {centerLabel}
+      </text>
+      <text
+        x={cx} y={cy + 9}
+        textAnchor="middle"
+        style={{ fontSize: 8, fill: "var(--muted)", fontFamily: "inherit" }}
+      >
+        {centerSub}
+      </text>
+    </svg>
+  );
+}
+
+const RADAR_TYPE_COLOR: Record<RadarType, string> = {
+  "healthy":     "oklch(0.62 0.22 151)",
+  "watch":       "oklch(0.72 0.13 207)",
+  "high-risk":   "oklch(0.62 0.22 25)",
+  "smart-money": "oklch(0.62 0.22 285)",
+  "viral":       "oklch(0.78 0.17 85)",
+};
+
+function BubblePlot({ tokens, onTokenClick }: { tokens: RadarToken[]; onTokenClick: (t: RadarToken) => void }) {
+  if (tokens.length === 0) {
+    return <div className="spEmpty" style={{ padding: "20px 0" }}>No token data — run indexer</div>;
+  }
+
+  const W = 320;
+  const H = 148;
+  const PAD = { t: 8, r: 8, b: 20, l: 36 };
+  const plotW = W - PAD.l - PAD.r;
+  const plotH = H - PAD.t - PAD.b;
+
+  const maxAge = Math.max(...tokens.map(t => t.ageMinutes), 1);
+  const maxVol = Math.max(...tokens.map(t => t.volume24hUsd), 1);
+  const maxMcap = Math.max(...tokens.map(t => t.marketCapUsd), 1);
+
+  const yTicks = [0, 0.5, 1];
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: "100%", height: "auto", display: "block" }}
+      aria-label="Age vs Volume bubble chart"
+    >
+      {/* Grid */}
+      {[0.25, 0.5, 0.75, 1].map(f => {
+        const y = PAD.t + plotH * (1 - f);
+        return <line key={f} x1={PAD.l} x2={W - PAD.r} y1={y} y2={y} stroke="oklch(0.22 0.02 255)" strokeWidth="0.5" />;
+      })}
+      {/* Axes */}
+      <line x1={PAD.l} x2={PAD.l} y1={PAD.t} y2={PAD.t + plotH} stroke="oklch(0.28 0.03 255)" strokeWidth="1" />
+      <line x1={PAD.l} x2={W - PAD.r} y1={PAD.t + plotH} y2={PAD.t + plotH} stroke="oklch(0.28 0.03 255)" strokeWidth="1" />
+      {/* Y labels */}
+      {yTicks.map(f => (
+        <text
+          key={f}
+          x={PAD.l - 3}
+          y={PAD.t + plotH * (1 - f)}
+          textAnchor="end"
+          dominantBaseline="middle"
+          style={{ fontSize: 7, fill: "oklch(0.40 0.04 255)", fontFamily: "inherit" }}
+        >
+          {f === 0 ? "$0" : money(f * maxVol)}
+        </text>
+      ))}
+      {/* X axis label */}
+      <text
+        x={PAD.l + plotW / 2}
+        y={H - 3}
+        textAnchor="middle"
+        style={{ fontSize: 7, fill: "oklch(0.40 0.04 255)", fontFamily: "inherit" }}
+      >
+        Age (minutes) →
+      </text>
+      {/* Bubbles */}
+      {tokens.map(t => {
+        const cx = PAD.l + (t.ageMinutes / maxAge) * plotW;
+        const cy = PAD.t + plotH - (t.volume24hUsd / maxVol) * plotH;
+        const r = Math.max(3, Math.min(10, 3 + (t.marketCapUsd / maxMcap) * 7));
+        const color = RADAR_TYPE_COLOR[t.radarType];
+        return (
+          <circle
+            key={t.id}
+            cx={cx} cy={cy} r={r}
+            fill={color}
+            fillOpacity={0.6}
+            stroke={color}
+            strokeWidth={1}
+            strokeOpacity={0.9}
+            style={{ cursor: "pointer" }}
+            onClick={() => onTokenClick(t)}
+          >
+            <title>{t.ticker} · {t.age} · {money(t.volume24hUsd)}</title>
+          </circle>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -1024,331 +1276,99 @@ function LatestLaunchesCard({ tokens, onSelect }: { tokens: RadarToken[]; onSele
   return (
     <section className="dataPanel latestLaunches">
       <PanelTitle icon={<Zap size={16} />} title="Latest Launches" />
-      <table>
-        <thead>
-          <tr>
-            <th>Token</th>
-            <th>Chain</th>
-            <th>Age</th>
-            <th>MCap</th>
-            <th>Vol</th>
-            <th>Risk</th>
-            <th>Smart Money</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tokens.slice(0, 6).map((token, index) => (
-            <tr key={token.address} onClick={() => onSelect(token)} style={{ cursor: "pointer" }}>
-              <td>
-                <span className="rank">{index + 1}</span>
-                <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
-                <span className="tokenLink">
-                  <strong>{token.ticker}</strong>
-                </span>
-              </td>
-              <td><ChainBadge chain={token.chain} /></td>
-              <td>{token.age}</td>
-              <td>{money(token.marketCapUsd)}</td>
-              <td>{money(token.volume24hUsd)}</td>
-              <td><RiskBadge level={token.riskLevel} /></td>
-              <td>
-                {token.smartWalletBuys > 0
-                  ? <span className={`signalPill ${token.smartWalletBuys >= 12 ? "green" : "amber"}`}>
-                      {token.smartWalletBuys} wallet{token.smartWalletBuys !== 1 ? "s" : ""}
-                    </span>
-                  : <span style={{ color: "var(--faint)", fontSize: 11 }}>—</span>
-                }
-              </td>
+      <div className="llScroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th>Chain</th>
+              <th>Age</th>
+              <th>MCap</th>
+              <th>Vol</th>
+              <th>Risk</th>
+              <th>Smart Money</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {tokens.slice(0, 20).map((token, index) => (
+              <tr key={token.address} onClick={() => onSelect(token)} style={{ cursor: "pointer" }}>
+                <td>
+                  <span className="rank">{index + 1}</span>
+                  <TokenLogo label={token.ticker} tone={logoPalette[index % logoPalette.length]} />
+                  <span className="tokenLink">
+                    <strong>{token.ticker}</strong>
+                  </span>
+                </td>
+                <td><ChainBadge chain={token.chain} /></td>
+                <td>{token.age}</td>
+                <td>{money(token.marketCapUsd)}</td>
+                <td>{money(token.volume24hUsd)}</td>
+                <td><RiskBadge level={token.riskLevel} /></td>
+                <td>
+                  {token.smartWalletBuys > 0
+                    ? <span className={`signalPill ${token.smartWalletBuys >= 12 ? "green" : "amber"}`}>
+                        {token.smartWalletBuys} wallet{token.smartWalletBuys !== 1 ? "s" : ""}
+                      </span>
+                    : <span style={{ color: "var(--faint)", fontSize: 11 }}>—</span>
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <button className="panelLink" type="button" onClick={() => { dispatchNavStart(); router.push("/launches"); }}>View All Launches <ArrowRight size={15} /></button>
     </section>
   );
 }
 
-function SmartMoneyFlowCard({ swaps }: { swaps: LiveSwap[] }) {
-  const router = useRouter();
-  const liveRows = swaps.slice(0, 5);
+function HighConvictionCard({ tokens, onSelect }: { tokens: RadarToken[]; onSelect: (token: RadarToken) => void }) {
+  const picks = tokens
+    .filter(t =>
+      (t.riskLevel === "Low" || t.riskLevel === "Medium") &&
+      t.smartWalletBuys > 0 &&
+      t.priceChange1h > 0,
+    )
+    .sort((a, b) => b.smartWalletBuys - a.smartWalletBuys || b.priceChange1h - a.priceChange1h)
+    .slice(0, 20);
 
   return (
-    <section className="dataPanel">
-      <PanelTitle icon={<Wallet size={16} />} title="Smart Money Flow" />
-      <div className="flowList">
-        {liveRows.length ? liveRows.map((swap) => {
-          const t0 = resolvedSymbol(swap.token0Symbol, swap.token0 ?? swap.poolAddress ?? "");
-          const t1 = resolvedSymbol(swap.token1Symbol, swap.token1 ?? "");
-          const pair = t1 ? `${t0}/${t1}` : t0;
-          const walletAddr = swap.sender ?? swap.txHash;
-          const isFullAddr = /^0x[a-fA-F0-9]{40}$/.test(walletAddr);
-          // amount0Raw negative means token0 left the pool → user bought token0
-          const isBuy = swap.amount0Raw.startsWith("-");
-          return (
-            <div className="flowRow liveSwapRow" key={`${swap.chain}-${swap.txHash}-${swap.blockNumber}`}>
-              <button
-                type="button"
-                className="walletHash"
-                title={walletAddr}
-                onClick={() => isFullAddr ? router.push(`/wallet/${walletAddr}`) : window.open(addressUrl(swap.chain, walletAddr), "_blank")}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left", font: "inherit", color: "var(--cyan)" }}
-              >
-                {shortAddress(walletAddr)}
-              </button>
-              <b className={isBuy ? "buy" : "sell"}>{isBuy ? "BUY" : "SELL"}</b>
-              <strong>{pair}</strong>
-              <span>{swap.chain.toUpperCase()}</span>
-              <a className="explorerLink muted" href={txUrl(swap.chain, swap.txHash)} target="_blank" rel="noopener noreferrer" title={swap.txHash}>
-                #{swap.blockNumber}
-              </a>
-            </div>
-          );
-        }) : (
-          <div style={{ padding: "16px 0", textAlign: "center", color: "var(--faint)", fontSize: 12 }}>
-            No swap activity yet — run the indexer
-          </div>
-        )}
-      </div>
-      <button className="panelLink" type="button" onClick={() => { dispatchNavStart(); router.push("/smart-money"); }}>View All Activity <ArrowRight size={15} /></button>
-    </section>
-  );
-}
-
-function RadarInsightsCard({ selected, tokens }: { selected?: RadarToken; tokens: RadarToken[] }) {
-  const highRisk = tokens.filter((t) => t.riskLevel === "High" || t.riskLevel === "Extreme").length;
-
-  // Top gainer by 1h change among visible tokens
-  const topGainer = tokens.length > 0
-    ? [...tokens].sort((a, b) => b.priceChange1h - a.priceChange1h)[0]
-    : null;
-  const momentumToken = selected ?? topGainer ?? null;
-  const momentumPct = momentumToken?.priceChange1h ?? 0;
-  const momentumPositive = momentumPct > 0;
-
-  // Overall buy pressure (buys vs sells across all visible tokens)
-  const totalBuys = tokens.reduce((s, t) => s + t.buys, 0);
-  const totalSells = tokens.reduce((s, t) => s + t.sells, 0);
-  const totalSwaps = totalBuys + totalSells;
-  const buyPressurePct = totalSwaps > 0 ? Math.round((totalBuys / totalSwaps) * 100) : 50;
-  const marketBullish = buyPressurePct >= 55;
-
-  // Total on-chain liquidity across tracked tokens
-  const totalLiquidity = tokens.reduce((s, t) => s + t.liquidityUsd, 0);
-  const liquidityFmt = totalLiquidity >= 1_000_000
-    ? `$${(totalLiquidity / 1_000_000).toFixed(1)}M`
-    : totalLiquidity >= 1_000
-      ? `$${(totalLiquidity / 1_000).toFixed(0)}K`
-      : "$0";
-
-  return (
-    <section className="dataPanel">
-      <PanelTitle icon={<Gauge size={16} />} title="Radar Insights" />
-      <div className="insightList">
-        <Insight
-          icon={<TrendingUp size={16} />}
-          tone={momentumPositive ? "green" : "red"}
-          title={
-            momentumToken
-              ? `${momentumToken.ticker} ${momentumPositive ? "up" : "down"} ${Math.abs(momentumPct).toFixed(1)}% (1h)`
-              : "No price data yet"
-          }
-          detail={
-            momentumToken
-              ? `Vol 24h: $${(momentumToken.volume24hUsd / 1000).toFixed(0)}K · ${momentumToken.buys}B / ${momentumToken.sells}S`
-              : "Run indexer to populate"
-          }
-        />
-        <Insight
-          icon={<AlertTriangle size={16} />}
-          tone={highRisk > 0 ? "red" : "green"}
-          title={
-            tokens.length === 0
-              ? "No tokens indexed yet"
-              : highRisk > 0
-                ? `${highRisk} high-risk token${highRisk > 1 ? "s" : ""} detected`
-                : "No high-risk tokens in current view"
-          }
-          detail={
-            tokens.length > 0
-              ? `${tokens.length} tokens scanned · ${tokens.filter(t => t.riskLevel === "Low").length} low-risk`
-              : "Waiting for indexer data"
-          }
-        />
-        <Insight
-          icon={<Droplets size={16} />}
-          tone={marketBullish ? "cyan" : "amber"}
-          title={
-            totalSwaps > 0
-              ? `${buyPressurePct}% buy pressure · ${marketBullish ? "Bullish" : "Bearish"} sentiment`
-              : "Awaiting swap data"
-          }
-          detail={
-            totalLiquidity > 0
-              ? `${liquidityFmt} total tracked liquidity · ${totalSwaps} swaps`
-              : totalSwaps > 0
-                ? `${totalBuys} buys · ${totalSells} sells across ${tokens.length} tokens`
-                : "Run indexer to see signals"
-          }
-        />
-      </div>
-    </section>
-  );
-}
-
-function LivePoolsCard({ pools, tokens }: { pools: LivePool[]; tokens: RadarToken[] }) {
-  const totalVolume = tokens.reduce((sum, t) => sum + t.volume24hUsd, 0);
-  const newest = pools.slice(0, 5);
-
-  return (
-    <section className="dataPanel livePools">
-      <PanelTitle icon={<Database size={16} />} title="Live Chain Pools" />
-      {newest.length ? (
-        <div className="livePoolList">
-          {newest.map((pool) => {
-            const t0 = resolvedSymbol(pool.token0Symbol, pool.token0);
-            const t1 = resolvedSymbol(pool.token1Symbol, pool.token1);
-            const poolHref = pool.poolAddress ? addressUrl(pool.chain, pool.poolAddress) : null;
-            const t0Href = pool.token0 && pool.token0 !== "0x0000000000000000000000000000000000000000" ? addressUrl(pool.chain, pool.token0) : null;
-            const t1Href = pool.token1 && pool.token1 !== "0x0000000000000000000000000000000000000000" ? addressUrl(pool.chain, pool.token1) : null;
-            return (
-              <div className="livePoolRow" key={`${pool.chain}-${pool.txHash}-${pool.poolAddress ?? pool.poolId}`}>
-                <div>
-                  <strong>
-                    {t0Href ? <a className="explorerLink" href={t0Href} target="_blank" rel="noopener noreferrer">{t0}</a> : t0}
-                    {" / "}
-                    {t1Href ? <a className="explorerLink" href={t1Href} target="_blank" rel="noopener noreferrer">{t1}</a> : t1}
-                  </strong>
-                  <span className="poolDex">
-                    {pool.dexName} · {pool.protocolVersion.toUpperCase()}
-                    {poolHref && (
-                      <a className="explorerLink poolExplorer" href={poolHref} target="_blank" rel="noopener noreferrer" title={pool.poolAddress ?? ""}>
-                        <ExternalLink size={11} />
-                      </a>
-                    )}
-                  </span>
-                </div>
-                <ChainBadge chain={pool.chain} />
-                <a className="explorerLink muted" href={txUrl(pool.chain, pool.txHash)} target="_blank" rel="noopener noreferrer" title={pool.txHash}>
-                  #{pool.blockNumber}
-                </a>
+    <section className="dataPanel highConviction">
+      <PanelTitle icon={<Gem size={16} />} title="High Conviction" />
+      <div className="hcScroll">
+        {picks.length === 0 ? (
+          <div className="hcEmpty">No high conviction setups right now</div>
+        ) : picks.map((token, i) => (
+          <div key={token.id} className="hcRow" onClick={() => onSelect(token)}>
+            <span className="rank">{i + 1}</span>
+            <TokenLogo label={token.ticker} tone={logoPalette[i % logoPalette.length]} />
+            <div className="hcMain">
+              <div className="hcTokenHead">
+                <strong>{token.ticker}</strong>
+                <ChainBadge chain={token.chain} />
+                <span className="hcAge">{token.age}</span>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="statMosaic">
-          <MosaicStat label="Live Pools" value="0" detail="waiting" />
-          <MosaicStat label="Active Tokens" value={`${tokens.length}`} detail="seed view" />
-          <MosaicStat label="Total Volume" value={money(totalVolume)} detail="demo tokens" />
-          <MosaicStat label="Data Source" value="MySQL" detail="indexer" />
-        </div>
-      )}
+              <div className="hcSignals">
+                <span className={`hcSignal ${token.riskLevel === "Low" ? "low" : "med"}`}>
+                  {token.riskLevel} Risk
+                </span>
+                <span className="hcSignal smart">
+                  {token.smartWalletBuys} smart wallet{token.smartWalletBuys !== 1 ? "s" : ""}
+                </span>
+                <span className="hcSignal momentum">
+                  +{token.priceChange1h.toFixed(1)}% 1h
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
-  );
-}
-
-function MiniCandlestickChart({ token, candles: realCandles }: { token: RadarToken; candles: Candle[] }) {
-  const candles = useMemo(
-    () => realCandles.map((c) => ({ open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })),
-    [realCandles],
-  );
-
-  if (!candles.length) {
-    return (
-      <div className="candlePanel" style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--faint)", fontSize: 11 }}>
-        No chart data yet — indexer collecting candles
-      </div>
-    );
-  }
-
-  const max = Math.max(...candles.map((item) => item.high));
-  const min = Math.min(...candles.map((item) => item.low));
-  const spread = max - min || 1;
-
-  return (
-    <div className="candlePanel">
-      <svg viewBox="0 0 320 156" role="img" aria-label={`${token.ticker} candlestick chart`}>
-        <g className="chartGrid">
-          {[24, 62, 100, 138].map((y) => <line key={y} x1="0" x2="320" y1={y} y2={y} />)}
-        </g>
-        {candles.map((item, index) => {
-          const x = 10 + index * 12;
-          const highY = chartNumber(18 + ((max - item.high) / spread) * 88);
-          const lowY = chartNumber(18 + ((max - item.low) / spread) * 88);
-          const openY = chartNumber(18 + ((max - item.open) / spread) * 88);
-          const closeY = chartNumber(18 + ((max - item.close) / spread) * 88);
-          const up = item.close >= item.open;
-          const bodyY = chartNumber(Math.min(openY, closeY));
-          const bodyH = chartNumber(Math.max(3, Math.abs(closeY - openY)));
-          const volumeH = chartNumber(8 + item.volume * 22);
-          return (
-            <g key={index} className={up ? "candleUp" : "candleDown"}>
-              <line x1={x} x2={x} y1={highY} y2={lowY} />
-              <rect x={x - 3} y={bodyY} width="6" height={bodyH} rx="1" />
-              <rect className="volumeBar" x={x - 4} y={chartNumber(144 - volumeH)} width="8" height={volumeH} rx="1" />
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
-}
-
-
-function GaugeCard({ label, value, caption, tone }: { label: string; value: number; caption: string; tone: string }) {
-  return (
-    <div className="gaugeCard">
-      <span>{label}</span>
-      <div className={`donut ${tone}`} style={{ "--value": `${Math.min(100, Math.max(0, value))}%` } as React.CSSProperties} />
-      <strong>{value}<small>/100</small></strong>
-      <em>{caption}</em>
-    </div>
-  );
-}
-
-function SignalCard({ label, value, detail, tone }: { label: string; value: string; detail: string; tone: string }) {
-  return (
-    <div className={`signalCard ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
-  );
-}
-
-function Insight({ icon, tone, title, detail }: { icon: React.ReactNode; tone: string; title: string; detail: string }) {
-  return (
-    <div className={`insight ${tone}`}>
-      <span>{icon}</span>
-      <div>
-        <strong>{title}</strong>
-        <small>{detail}</small>
-      </div>
-    </div>
   );
 }
 
 function PanelTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return <h2 className="panelTitle">{icon}{title}</h2>;
-}
-
-function DetailStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function MosaicStat({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return (
-    <div className="mosaicStat">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <small>{detail}</small>
-    </div>
-  );
 }
 
 function LegendDot({ type, label }: { type: RadarType; label: string }) {
@@ -1426,19 +1446,6 @@ function radarType(token: TokenSummary, index: number): RadarType {
   return "healthy";
 }
 
-
-function buyerPressure(token: RadarToken) {
-  const total = token.buyers + token.sellers;
-  return total ? Math.round((token.buyers / total) * 100) : 0;
-}
-
-function chartNumber(value: number) { return Number(value.toFixed(3)); }
-
-function riskTone(level: RiskLevel) {
-  if (level === "Low") return "green";
-  if (level === "Medium") return "amber";
-  return "red";
-}
 
 function signedPct(value: number) { return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`; }
 
